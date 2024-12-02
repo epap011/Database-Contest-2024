@@ -11,8 +11,8 @@ DataExecuterDemo::DataExecuterDemo(int end, int count) : DataExecuter()
     this->count = count;
     for (int i = 0; i <= end; ++i) {
         std::vector<int> tuple;
-        tuple.push_back(rand());
-        tuple.push_back(rand());
+        tuple.push_back(rand() % end);
+        tuple.push_back(rand() % end);
         set.push_back(tuple);
     }
 }
@@ -20,8 +20,8 @@ DataExecuterDemo::DataExecuterDemo(int end, int count) : DataExecuter()
 std::vector<int> DataExecuterDemo::generateInsert()
 {
     std::vector<int> tuple;
-    tuple.push_back(rand());
-    tuple.push_back(rand());
+    tuple.push_back(rand() % end);
+    tuple.push_back(rand() % end);
     set.push_back(tuple);
     end++;
     return tuple;
