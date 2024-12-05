@@ -5,7 +5,6 @@
 #include <CardinalityEstimation.h>
 
 #define MEM_LIMIT_BYTES 4194304
-#define MAX_VALUE 20000000
 #define BUCKETS 259741
 #define BINS 513
 #define BIN_SIZE 39062
