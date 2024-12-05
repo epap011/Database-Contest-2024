@@ -1,7 +1,7 @@
 //
 // Demo data generator for local debugging. You can implement your own data generator for debugging based on this class.
 //
-#define MAX_VALUE 20000000
+#define MAX_VALUE 10000
 
 #include <executer/DataExecuterDemo.h>
 
@@ -30,9 +30,9 @@ std::vector<int> DataExecuterDemo::generateInsert()
 
 int DataExecuterDemo::generateDelete()
 {
-    int x = (rand()) % MAX_VALUE + 1;
+    int x = (rand()) % end;
     while (vis[x]) {
-        x = (rand()) % MAX_VALUE + 1;
+        x = (rand()) % end;
     }
     vis[x] = true;
     return x;
@@ -100,7 +100,7 @@ double DataExecuterDemo::answer(int ans)
             cnt++;
     }
     double error = fabs(std::log((ans + 1) * 1.0 / (cnt + 1)));
-    if(curAction.quals.size() == 2)
-        printf("Real: %d\t\tEstimate: %d\n",cnt,ans);
+    // if(curAction.quals.size() == 2)
+    //     printf("Real: %d\t\tEstimate: %d\n",cnt,ans);
     return error;
 };
