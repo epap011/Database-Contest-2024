@@ -1,6 +1,7 @@
 //
 // Demo data generator for local debugging. You can implement your own data generator for debugging based on this class.
 //
+#define MAX_VALUE 20000000
 
 #include <executer/DataExecuterDemo.h>
 
@@ -11,8 +12,8 @@ DataExecuterDemo::DataExecuterDemo(int end, int count) : DataExecuter()
     this->count = count;
     for (int i = 0; i <= end; ++i) {
         std::vector<int> tuple;
-        tuple.push_back(rand() % end);
-        tuple.push_back(rand() % end);
+        tuple.push_back(rand() % MAX_VALUE + 1);
+        tuple.push_back(rand() % MAX_VALUE + 1);
         set.push_back(tuple);
     }
 }
@@ -20,8 +21,8 @@ DataExecuterDemo::DataExecuterDemo(int end, int count) : DataExecuter()
 std::vector<int> DataExecuterDemo::generateInsert()
 {
     std::vector<int> tuple;
-    tuple.push_back(rand() % end);
-    tuple.push_back(rand() % end);
+    tuple.push_back(rand() % MAX_VALUE + 1);
+    tuple.push_back(rand() % MAX_VALUE + 1);
     set.push_back(tuple);
     end++;
     return tuple;
@@ -29,9 +30,9 @@ std::vector<int> DataExecuterDemo::generateInsert()
 
 int DataExecuterDemo::generateDelete()
 {
-    int x = (rand()) % end;
+    int x = (rand()) % MAX_VALUE + 1;
     while (vis[x]) {
-        x = (rand()) % end;
+        x = (rand()) % MAX_VALUE + 1;
     }
     vis[x] = true;
     return x;
@@ -56,8 +57,14 @@ Action DataExecuterDemo::getNextAction()
     }
     if (count % 100 == 99) {
         action.actionType = QUERY;
-        CompareExpression expr = {rand() % 2, CompareOp(rand() % 2), rand()};
+        CompareExpression expr = {rand() % 2, CompareOp(rand() % 2), rand() % MAX_VALUE + 1};
         action.quals.push_back(expr);
+    } else if (count % 100 == 98){
+        action.actionType = QUERY;
+        CompareExpression expr1 = {rand() % 2, CompareOp(rand() % 2), rand() % MAX_VALUE + 1};
+        action.quals.push_back(expr1);
+        CompareExpression expr2 = {rand() % 2, CompareOp(rand() % 2), rand() % MAX_VALUE + 1};
+        action.quals.push_back(expr2);
     } else if (count % 100 < 90) {
         action.actionType = INSERT;
         action.actionTuple = generateInsert();
@@ -93,5 +100,7 @@ double DataExecuterDemo::answer(int ans)
             cnt++;
     }
     double error = fabs(std::log((ans + 1) * 1.0 / (cnt + 1)));
+    if(curAction.quals.size() == 2)
+        printf("Real: %d\t\tEstimate: %d\n",cnt,ans);
     return error;
 };
