@@ -5,18 +5,10 @@
 #include <CardinalityEstimation.h>
 
 #define MEM_LIMIT_BYTES 4194304
-// Highest Accuracy
-//----------------------------------
-// #define BUCKETS 259741
-// #define BUCKET_SIZE 77
-// #define BINS 513
-// #define BIN_SIZE 39062
-// #define CHUNK_SIZE 10000
-//----------------------------------
-#define BUCKETS 129871
-#define BUCKET_SIZE 154
-#define BINS 257
-#define BIN_SIZE 77821
+#define BUCKETS 259741
+#define BINS 513
+#define BIN_SIZE 39062
+#define BUCKET_SIZE 77
 #define CHUNK_SIZE 10000
 
 u_int32_t histogram[BINS][BINS] = {0}; // 513 * 513 * 4 = 1,052,676 Bytes = 1,003 MB
@@ -54,8 +46,6 @@ int CEEngine::query(const std::vector<CompareExpression>& quals)
     // Implement your query logic here.
 
     u_int32_t ans = 0;
-
-    return 0;
 
     if (quals.size() == 1) {
         // A = x OR B = y | // Time Complexity: O(1)

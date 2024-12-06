@@ -5,19 +5,14 @@
 #include <CardinalityEstimation.h>
 
 #define MEM_LIMIT_BYTES 4194304
-// Highest Accuracy
-//----------------------------------
-// #define BUCKETS 259741
-// #define BUCKET_SIZE 77
-// #define BINS 513
-// #define BIN_SIZE 39062
-// #define CHUNK_SIZE 10000
-//----------------------------------
-#define BUCKETS 129871
-#define BUCKET_SIZE 154
-#define BINS 257
-#define BIN_SIZE 77821
-#define CHUNK_SIZE 10000
+#define BUCKETS 259741
+#define BINS 513
+#define BIN_SIZE 39062
+#define BUCKET_SIZE 77
+#define CHUNK_SIZE 100000
+
+//259740.25974026
+//38986.354775828
 
 u_int32_t histogram[BINS][BINS] = {0}; // 513 * 513 * 4 = 1,052,676 Bytes = 1,003 MB
 u_int32_t buckets_of_A[BUCKETS] = {0}; // 259741 * 4 = 1,038,964 Bytes = 0.99 MB  | bins per bucket = 77
@@ -54,8 +49,6 @@ int CEEngine::query(const std::vector<CompareExpression>& quals)
     // Implement your query logic here.
 
     u_int32_t ans = 0;
-
-    return 0;
 
     if (quals.size() == 1) {
         // A = x OR B = y | // Time Complexity: O(1)
@@ -167,9 +160,6 @@ CEEngine::CEEngine(int num, DataExecuter *dataExecuter)
     // Implement your constructor here.
     this->dataExecuter = dataExecuter;
 
-    // Memory for data structures
-    u_int32_t data_structures_memory = sizeof(histogram) + sizeof(buckets_of_A) + sizeof(buckets_of_B);
-
     // Read all data from dataExecuter
     std::vector<std::vector<int>> data;
     for (u_int32_t i = 0; i < num; i+=CHUNK_SIZE) {
@@ -182,21 +172,6 @@ CEEngine::CEEngine(int num, DataExecuter *dataExecuter)
             histogram[A/BIN_SIZE][B/BIN_SIZE]++;
             buckets_of_A[A/BUCKET_SIZE]++;
             buckets_of_B[B/BUCKET_SIZE]++;
-
-            // //Memory of data
-            // u_int32_t vector_data = 0;
-
-            // // Memory for the outer vector (std::vector<std::vector<int>>)
-            // vector_data = CHUNK_SIZE * sizeof(std::vector<int>); // Vector of vectors, storing pointers to inner vectors
-
-            // // Memory for each inner vector (std::vector<int>)
-            // for (u_int32_t k = 0; k < CHUNK_SIZE; k++) {
-            //     vector_data += 2 * sizeof(int);          // Memory for the elements in the vector
-            //     vector_data += sizeof(std::vector<int>); // Memory for the vector structure itself
-            // }
-
-            // // Total Memory
-            // std::cout << "Data-Structures Memory: " << data_structures_memory/1024.0/1024.0 << " MB" << " | Vector Memory: " << vector_data/1024.0/1024.0 << " MB" << " | Total Memory: " << (data_structures_memory + vector_data + 20)/1024.0/1024.0 << " MB" << std::endl;
         }
 
         std::vector<std::vector<int>>().swap(data);
