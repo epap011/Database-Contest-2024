@@ -52,6 +52,8 @@ int CEEngine::query(const std::vector<CompareExpression>& quals)
 
     u_int32_t ans = 0;
 
+    return 420;
+
     if (quals.size() == 1) {
         // A = x OR B = y | // Time Complexity: O(1)
         if (quals[0].compareOp == 0) {
@@ -165,21 +167,39 @@ CEEngine::CEEngine(int num, DataExecuter *dataExecuter)
 {
     // Implement your constructor here.
     this->dataExecuter = dataExecuter;
-    
+
+    // Memory for data structures
+    u_int32_t data_structures_memory = sizeof(histogram) + sizeof(buckets_of_A) + sizeof(buckets_of_B);
+
     // Read all data from dataExecuter
     std::vector<std::vector<int>> data;
-    for (int i = 0; i < num; i+=OFFSET) {
-        dataExecuter->readTuples(i, OFFSET*SAMPLING_RATE, data);
-        for(int j = 0; j < OFFSET*SAMPLING_RATE; j++){
+    for (u_int32_t i = 0; i < num; i+=CHUNK_SIZE) {
+        dataExecuter->readTuples(i, CHUNK_SIZE, data);
 
-            u_int32_t A = data[0][0];
-            u_int32_t B = data[0][1];
+        for (u_int32_t j = 0; j < CHUNK_SIZE; j++) {
+            u_int32_t A = data[j][0];
+            u_int32_t B = data[j][1];
 
             histogram[A/BIN_SIZE][B/BIN_SIZE]++;
-
             buckets_of_A[A/BUCKET_SIZE]++;
             buckets_of_B[B/BUCKET_SIZE]++;
+
+            // //Memory of data
+            // u_int32_t vector_data = 0;
+
+            // // Memory for the outer vector (std::vector<std::vector<int>>)
+            // vector_data = CHUNK_SIZE * sizeof(std::vector<int>); // Vector of vectors, storing pointers to inner vectors
+
+            // // Memory for each inner vector (std::vector<int>)
+            // for (u_int32_t k = 0; k < CHUNK_SIZE; k++) {
+            //     vector_data += 2 * sizeof(int);          // Memory for the elements in the vector
+            //     vector_data += sizeof(std::vector<int>); // Memory for the vector structure itself
+            // }
+
+            // // Total Memory
+            // std::cout << "Data-Structures Memory: " << data_structures_memory/1024.0/1024.0 << " MB" << " | Vector Memory: " << vector_data/1024.0/1024.0 << " MB" << " | Total Memory: " << (data_structures_memory + vector_data + 20)/1024.0/1024.0 << " MB" << std::endl;
         }
-        data.clear();
+
+        std::vector<std::vector<int>>().swap(data);
     }
 }
