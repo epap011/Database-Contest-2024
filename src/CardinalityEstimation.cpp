@@ -9,6 +9,9 @@
 #define BINS 513
 #define BIN_SIZE 39062
 #define BUCKET_SIZE 77
+#define OFFSET 10000
+#define SAMPLING_RATE 0.05
+#define SAMPLING_CORRECTION 20
 
 //259740.25974026
 //38986.354775828
@@ -55,7 +58,7 @@ int CEEngine::query(const std::vector<CompareExpression>& quals)
             u_int32_t A = quals[0].value;
             u_int32_t B = quals[0].value;
 
-            return quals[0].columnIdx == 0 ? buckets_of_A[A/BUCKET_SIZE]/BUCKET_SIZE : buckets_of_B[B/BUCKET_SIZE]/BUCKET_SIZE;
+            return quals[0].columnIdx == 0 ? (buckets_of_A[A/BUCKET_SIZE]/BUCKET_SIZE)*SAMPLING_CORRECTION : (buckets_of_B[B/BUCKET_SIZE]/BUCKET_SIZE)*SAMPLING_CORRECTION;
         }
 
         // A > x OR B > y | // Time Complexity: O(|Buckets|)
@@ -85,7 +88,7 @@ int CEEngine::query(const std::vector<CompareExpression>& quals)
                 total_count += proportion;
             }
 
-            return total_count;
+            return total_count*SAMPLING_CORRECTION;
         }
     } 
     
@@ -113,7 +116,9 @@ int CEEngine::query(const std::vector<CompareExpression>& quals)
                 total_count += histogram[A/BIN_SIZE][i];
             }
 
-            return total_count;
+            //total_count /= BIN_SIZE;
+
+            return total_count*SAMPLING_CORRECTION;
         }
 
         // // A > x AND B = y
@@ -129,7 +134,9 @@ int CEEngine::query(const std::vector<CompareExpression>& quals)
                 total_count += histogram[i][B/BIN_SIZE];
             }
 
-            return total_count;
+            //total_count /= BIN_SIZE;
+
+            return total_count*SAMPLING_CORRECTION;
         }
 
         // // A > x AND B > y
@@ -144,7 +151,7 @@ int CEEngine::query(const std::vector<CompareExpression>& quals)
                 }
             }
 
-            return total_count;
+            return total_count*SAMPLING_CORRECTION;
         }
     }
 }
@@ -161,17 +168,18 @@ CEEngine::CEEngine(int num, DataExecuter *dataExecuter)
     
     // Read all data from dataExecuter
     std::vector<std::vector<int>> data;
-    for (int i = 0; i < num; i++) {
-        dataExecuter->readTuples(i, 1, data);
+    for (int i = 0; i < num; i+=OFFSET) {
+        dataExecuter->readTuples(i, OFFSET*SAMPLING_RATE, data);
+        for(int j = 0; j < OFFSET*SAMPLING_RATE; j++){
 
-        u_int32_t A = data[0][0];
-        u_int32_t B = data[0][1];
+            u_int32_t A = data[0][0];
+            u_int32_t B = data[0][1];
 
-        histogram[A/BIN_SIZE][B/BIN_SIZE]++;
+            histogram[A/BIN_SIZE][B/BIN_SIZE]++;
 
-        buckets_of_A[A/BUCKET_SIZE]++;
-        buckets_of_B[B/BUCKET_SIZE]++;
-
+            buckets_of_A[A/BUCKET_SIZE]++;
+            buckets_of_B[B/BUCKET_SIZE]++;
+        }
         data.clear();
     }
 }

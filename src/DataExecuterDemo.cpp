@@ -1,7 +1,7 @@
 //
 // Demo data generator for local debugging. You can implement your own data generator for debugging based on this class.
 //
-#define MAX_VALUE 10000
+#define MAX_VALUE 20000000
 
 #include <executer/DataExecuterDemo.h>
 
@@ -41,6 +41,8 @@ int DataExecuterDemo::generateDelete()
 void DataExecuterDemo::readTuples(int start, int offset, std::vector<std::vector<int>> &vec)
 {
     for (int i = start; i < start + offset; ++i) {
+        if (i > end)
+            break;
         if (!vis[i]) {
             vec.push_back(set[i]);
         }
