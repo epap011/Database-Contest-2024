@@ -7,6 +7,7 @@
 #include <common/Root.h>
 #include <common/Expression.h>
 #include <executer/DataExecuter.h>
+#include <CardinalityEstimation.h>
 
 /**
  * An enum stands for the action operator.
@@ -37,7 +38,10 @@ public:
     DataExecuterDemo(int end, int count);
     Action getNextAction();
     void readTuples(int tupleId, int offset, std::vector<std::vector<int>> &vec);
+    void readHardTuples(int start, int offset, std::string tuples, std::vector<std::vector<int>> &vec);
     double answer(int ans);
+    int answerCnt(Action queryAction);
+    void HardcodedDataGenerator(std::string tuples, std::string queries, std::string results);
 };
 
 #endif

@@ -19,5 +19,7 @@ public:
      * @param vec Stores read tuples.
      */
     virtual void readTuples(int tupleId, int offset, std::vector<std::vector<int>> &vec) = 0;
+    //temporary for debugging
+    virtual void readHardTuples(int start, int offset, std::string tuples, std::vector<std::vector<int>> &vec) = 0;
 };
 #endif
