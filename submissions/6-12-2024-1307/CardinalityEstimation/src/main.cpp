@@ -3,8 +3,8 @@
 
 int main(int argc, char *argv[])
 {
-    int initSize = 50000; // Initial data size.
-    int opSize = 20000; // Number of operations.
+    int initSize = 20000000; // Initial data size.
+    int opSize = 10000; // Number of operations.
     double score = 0;
     int cnt = 0;
     
@@ -29,8 +29,8 @@ int main(int argc, char *argv[])
         ceEngine.prepare();
         if (action.actionType == INSERT) {
             ceEngine.insertTuple(action.actionTuple);
-        } else if (action.actionType == DELETE) {
-           ceEngine.deleteTuple(action.actionTuple, action.tupleId);
+        //} else if (action.actionType == DELETE) {
+        //    ceEngine.deleteTuple(action.actionTuple, action.tupleId);
         } else if (action.actionType == QUERY) {
             int ans = ceEngine.query(action.quals);
             score += dataExecuter.answer(ans);
