@@ -31,5 +31,8 @@
 *.out
 *.app
 
+# Datasets
+datasets/tuples.txt
+
 build/
 .vscode/
