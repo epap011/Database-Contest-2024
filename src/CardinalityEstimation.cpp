@@ -10,8 +10,9 @@
 #define BINS 513
 #define BIN_SIZE 39062
 #define BUCKET_SIZE 77
-#define OFFSET 10000
+#define OFFSET 500000
 #define SAMPLING_RATE 0.01
+#define SAMPLING_CORRECTION 100
 
 //259740.25974026
 //38986.354775828
@@ -58,7 +59,7 @@ int CEEngine::query(const std::vector<CompareExpression>& quals)
             u_int32_t A = quals[0].value;
             u_int32_t B = quals[0].value;
 
-            return quals[0].columnIdx == 0 ? (buckets_of_A[A/BUCKET_SIZE]/BUCKET_SIZE)*(1/SAMPLING_RATE) : (buckets_of_B[B/BUCKET_SIZE]/BUCKET_SIZE)*(1/SAMPLING_RATE);
+            return quals[0].columnIdx == 0 ? (buckets_of_A[A/BUCKET_SIZE]/BUCKET_SIZE)*(SAMPLING_CORRECTION) : (buckets_of_B[B/BUCKET_SIZE]/BUCKET_SIZE)*(SAMPLING_CORRECTION);
         }
 
         // A > x OR B > y | // Time Complexity: O(|Buckets|)
@@ -88,7 +89,7 @@ int CEEngine::query(const std::vector<CompareExpression>& quals)
                 total_count += proportion;
             }
 
-            return total_count*(1/SAMPLING_RATE);
+            return total_count*(SAMPLING_CORRECTION);
         }
     } 
     
@@ -116,7 +117,7 @@ int CEEngine::query(const std::vector<CompareExpression>& quals)
                 total_count += histogram[A/BIN_SIZE][i];
             }
 
-            return total_count*(1/SAMPLING_RATE);
+            return total_count*(SAMPLING_CORRECTION);
         }
 
         // // A > x AND B = y
@@ -132,7 +133,7 @@ int CEEngine::query(const std::vector<CompareExpression>& quals)
                 total_count += histogram[i][B/BIN_SIZE];
             }
 
-            return total_count*(1/SAMPLING_RATE);
+            return total_count*(SAMPLING_CORRECTION);
         }
 
         // // A > x AND B > y
@@ -147,7 +148,7 @@ int CEEngine::query(const std::vector<CompareExpression>& quals)
                 }
             }
 
-            return total_count*(1/SAMPLING_RATE);
+            return total_count*(SAMPLING_CORRECTION);
         }
     }
 }
