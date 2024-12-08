@@ -168,7 +168,7 @@ CEEngine::CEEngine(int num, DataExecuter *dataExecuter)
     for (int i = 0; i < num; i+=OFFSET*(1-SAMPLING_RATE)) {
         //dataExecuter->readTuples(i, 1, data);
         //debugging
-        dataExecuter->readHardTuples(i, OFFSET*SAMPLING_RATE, "tuples.txt", data);
+        dataExecuter->readHardTuples(i, OFFSET*SAMPLING_RATE, "../datasets/tuples.txt", data);
         //if (i%10000 == 0) std::cout << i << " tuples read" << std::endl << "tuple: " << data[0][0] << " " << data[0][1] << std::endl;
         for (int j = 0; j < data.size(); j++) {
             u_int32_t A = data[j][0];

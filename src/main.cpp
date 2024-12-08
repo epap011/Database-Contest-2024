@@ -19,7 +19,7 @@ int main(int argc, char *argv[])
     auto start1 = std::chrono::high_resolution_clock::now();
     CEEngine ceEngine(initSize, &dataExecuter);
 
-    // dataExecuter.HardcodedDataGenerator("tuples.txt", "queries.txt", "results.txt");
+    // dataExecuter.HardcodedDataGenerator("../datasets/tuples.txt", "../datasets/queries.txt", "../datasets/results.txt");
     auto stop1 = std::chrono::high_resolution_clock::now();
     auto duration1 = std::chrono::duration_cast<std::chrono::milliseconds>(stop1 - start1);
     // std::cout << "Time taken by Data Generator: "
@@ -30,8 +30,8 @@ int main(int argc, char *argv[])
 
     auto start2 = std::chrono::high_resolution_clock::now();
 
-    std::ifstream queriesFile("queries.txt");
-    std::ifstream resultsFile("results.txt");
+    std::ifstream queriesFile("../datasets/queries.txt");
+    std::ifstream resultsFile("../datasets/results.txt");
 
     Action queryAction;
     queryAction.actionType = QUERY;
