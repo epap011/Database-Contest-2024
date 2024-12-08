@@ -169,7 +169,10 @@ CEEngine::CEEngine(int num, DataExecuter *dataExecuter)
 {
     // Implement your constructor here.
     this->dataExecuter = dataExecuter;
-    
+
+    // Memory for data structures
+    u_int32_t data_structures_memory = sizeof(histogram) + sizeof(buckets_of_A) + sizeof(buckets_of_B);
+
     // Read all data from dataExecuter
     
     std::vector<std::vector<int>> data;
@@ -187,10 +190,23 @@ CEEngine::CEEngine(int num, DataExecuter *dataExecuter)
             // testbucket[(j+1)%2] = B-3;
 
             histogram[A/BIN_SIZE][B/BIN_SIZE]++;
-
             buckets_of_A[A/BUCKET_SIZE]++;
             buckets_of_B[B/BUCKET_SIZE]++;
 
+            // //Memory of data
+            // u_int32_t vector_data = 0;
+
+            // // Memory for the outer vector (std::vector<std::vector<int>>)
+            // vector_data = OFFSET * SAMPLING_RATE * sizeof(std::vector<int>); // Vector of vectors, storing pointers to inner vectors
+
+            // // Memory for each inner vector (std::vector<int>)
+            // for (u_int32_t k = 0; k < OFFSET*SAMPLING_RATE; k++) {
+            //     vector_data += 2 * sizeof(int);          // Memory for the elements in the vector
+            //     vector_data += sizeof(std::vector<int>); // Memory for the vector structure itself
+            // }
+
+            // // Total Memory
+            // std::cout << "Data-Structures Memory: " << data_structures_memory/1024.0/1024.0 << " MB" << " | Vector Memory: " << vector_data/1024.0/1024.0 << " MB" << " | Total Memory: " << (data_structures_memory + vector_data + 20)/1024.0/1024.0 << " MB" << std::endl;
         }
     }
     data.clear();
