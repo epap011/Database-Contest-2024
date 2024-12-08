@@ -9,9 +9,9 @@
 #define BINS 513
 #define BIN_SIZE 39062
 #define BUCKET_SIZE 77
-#define OFFSET 10000
-#define SAMPLING_RATE 0.05
-#define SAMPLING_CORRECTION 20
+#define OFFSET 500000
+#define SAMPLING_RATE 0.01
+#define SAMPLING_CORRECTION 100
 
 //259740.25974026
 //38986.354775828
@@ -19,6 +19,9 @@
 u_int32_t histogram[BINS][BINS] = {0}; // 513 * 513 * 4 = 1,052,676 Bytes = 1,003 MB
 u_int32_t buckets_of_A[BUCKETS] = {0}; // 259741 * 4 = 1,038,964 Bytes = 0.99 MB  | bins per bucket = 77
 u_int32_t buckets_of_B[BUCKETS] = {0}; // 259741 * 4 = 1,038,964 Bytes = 0.99 MB  | bins per bucket = 77
+
+//debugging
+// u_int32_t testbucket[2] = {0}; // 8 Bytes
 
 // Total Memory for data structure: 1,003 + 0.99 + 0.99 = 2.97 MB
 
@@ -49,6 +52,7 @@ void CEEngine::deleteTuple(const std::vector<int>& tuple, int tupleId)
 int CEEngine::query(const std::vector<CompareExpression>& quals)
 {
     // Implement your query logic here.
+    //return 0;
 
     u_int32_t ans = 0;
 
@@ -94,7 +98,7 @@ int CEEngine::query(const std::vector<CompareExpression>& quals)
     
     if (quals.size() == 2) {
 
-        //A = x AND B = y
+        // A = x AND B = y
         if (quals[0].compareOp == 0 && quals[1].compareOp == 0) {
             u_int32_t A = quals[0].value;
             u_int32_t B = quals[1].value;
@@ -103,7 +107,7 @@ int CEEngine::query(const std::vector<CompareExpression>& quals)
             return 0;
         }
 
-        // // A = x AND B > y
+        // A = x AND B > y
         if (quals[0].compareOp == 0 && quals[1].compareOp == 1) {
             u_int32_t A = quals[0].value;
             u_int32_t B = quals[1].value;
@@ -121,7 +125,7 @@ int CEEngine::query(const std::vector<CompareExpression>& quals)
             return total_count*SAMPLING_CORRECTION;
         }
 
-        // // A > x AND B = y
+        // A > x AND B = y
         if (quals[0].compareOp == 1 && quals[1].compareOp == 0) {
             u_int32_t A = quals[0].value;
             u_int32_t B = quals[1].value;
@@ -139,7 +143,7 @@ int CEEngine::query(const std::vector<CompareExpression>& quals)
             return total_count*SAMPLING_CORRECTION;
         }
 
-        // // A > x AND B > y
+        // A > x AND B > y
         if (quals[0].compareOp == 1 && quals[1].compareOp == 1) {
             u_int32_t A = quals[0].value;
             u_int32_t B = quals[1].value;
@@ -167,19 +171,27 @@ CEEngine::CEEngine(int num, DataExecuter *dataExecuter)
     this->dataExecuter = dataExecuter;
     
     // Read all data from dataExecuter
+    
     std::vector<std::vector<int>> data;
+    u_int32_t A,B;
+
     for (int i = 0; i < num; i+=OFFSET) {
+        data.clear();
         dataExecuter->readTuples(i, OFFSET*SAMPLING_RATE, data);
         for(int j = 0; j < OFFSET*SAMPLING_RATE; j++){
 
-            u_int32_t A = data[0][0];
-            u_int32_t B = data[0][1];
+            A = data[j][0];
+            B = data[j][1];
+
+            // testbucket[j%2] = A+3;
+            // testbucket[(j+1)%2] = B-3;
 
             histogram[A/BIN_SIZE][B/BIN_SIZE]++;
 
             buckets_of_A[A/BUCKET_SIZE]++;
             buckets_of_B[B/BUCKET_SIZE]++;
+
         }
-        data.clear();
     }
+    data.clear();
 }

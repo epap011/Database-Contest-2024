@@ -30,9 +30,9 @@ std::vector<int> DataExecuterDemo::generateInsert()
 
 int DataExecuterDemo::generateDelete()
 {
-    int x = (rand()) % end;
+    int x = (rand()) % (end+1);
     while (vis[x]) {
-        x = (rand()) % end;
+        x = (rand()) % (end+1);
     }
     vis[x] = true;
     return x;
@@ -47,6 +47,7 @@ void DataExecuterDemo::readTuples(int start, int offset, std::vector<std::vector
             vec.push_back(set[i]);
         }
     }
+    // std::cout << "Tuple["<< start <<"]: " << set[start][0] << " " << set[start][1] << std::endl;
     return;
 };
 
