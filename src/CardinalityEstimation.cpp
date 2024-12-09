@@ -5,6 +5,7 @@
 #include <CardinalityEstimation.h>
 
 #define MEM_LIMIT_BYTES 4194304
+#define MAX_VALUE 20000000
 #define BUCKETS 259741
 #define BINS 513
 #define BIN_SIZE 39062
@@ -19,6 +20,8 @@
 u_int32_t histogram[BINS][BINS] = {0}; // 513 * 513 * 4 = 1,052,676 Bytes = 1,003 MB
 u_int32_t buckets_of_A[BUCKETS] = {0}; // 259741 * 4 = 1,038,964 Bytes = 0.99 MB  | bins per bucket = 77
 u_int32_t buckets_of_B[BUCKETS] = {0}; // 259741 * 4 = 1,038,964 Bytes = 0.99 MB  | bins per bucket = 77
+
+u_int32_t init_size = 0;
 
 //debugging
 // u_int32_t testbucket[2] = {0}; // 8 Bytes
@@ -35,6 +38,8 @@ void CEEngine::insertTuple(const std::vector<int>& tuple)
     histogram[A/BIN_SIZE][B/BIN_SIZE]++;
     buckets_of_A[A/BUCKET_SIZE]++;
     buckets_of_B[B/BUCKET_SIZE]++;
+
+    init_size++;
 }
 
 void CEEngine::deleteTuple(const std::vector<int>& tuple, int tupleId)
@@ -47,117 +52,144 @@ void CEEngine::deleteTuple(const std::vector<int>& tuple, int tupleId)
     histogram[A/BIN_SIZE][B/BIN_SIZE]--;
     buckets_of_A[A/BUCKET_SIZE]--;
     buckets_of_B[B/BUCKET_SIZE]--;
+
+    init_size--;
 }
 
 int CEEngine::query(const std::vector<CompareExpression>& quals)
 {
     // Implement your query logic here.
 
-    u_int32_t ans = 0;
-
     if (quals.size() == 1) {
-        // A = x OR B = y | // Time Complexity: O(1)
-        if (quals[0].compareOp == 0) {
-            u_int32_t A = quals[0].value;
-            u_int32_t B = quals[0].value;
+        // A = x OR B = x | // Time Complexity: O(1)
+        if (quals[0].compareOp == EQUAL) {
+            u_int32_t value = quals[0].value;
 
-            return quals[0].columnIdx == 0 ? (buckets_of_A[A/BUCKET_SIZE]/BUCKET_SIZE)*SAMPLING_CORRECTION : (buckets_of_B[B/BUCKET_SIZE]/BUCKET_SIZE)*SAMPLING_CORRECTION;
+            //Probabilistic
+            return quals[0].columnIdx == 0 ? (buckets_of_A[value/BUCKET_SIZE]/BUCKET_SIZE)*SAMPLING_CORRECTION : (buckets_of_B[value/BUCKET_SIZE]/BUCKET_SIZE)*SAMPLING_CORRECTION;
+            
         }
 
-        // A > x OR B > y | // Time Complexity: O(|Buckets|)
-        if (quals[0].compareOp == 1) {
-            u_int32_t A = quals[0].value;
-            u_int32_t B = quals[0].value;
+        // A > x OR B > x | // Time Complexity: O(|Buckets|)
+        if (quals[0].compareOp == GREATER) {
+            // u_int32_t A = quals[0].value;
+            // u_int32_t B = quals[0].value;
             
-            u_int32_t total_count = 0;
+            // u_int32_t total_count = 0;
 
             // A > x
             if (quals[0].columnIdx == 0) {
-                for (u_int32_t i = A/BUCKET_SIZE+1; i < BUCKETS; i++) {
-                    total_count += buckets_of_A[i];
-                }
+                // for (u_int32_t i = A/BUCKET_SIZE+1; i < BUCKETS; i++) {
+                //     total_count += buckets_of_A[i];
+                // }
 
-                // Experimental
-                // u_int32_t last_element = (A/BUCKET_SIZE+1)*(BUCKET_SIZE)-1;
-                // u_int32_t proportion = (last_element - A)/10 * buckets_of_A[A/BUCKET_SIZE];
-                // total_count += proportion;
+                // // Experimental
+                // // u_int32_t last_element = (A/BUCKET_SIZE+1)*(BUCKET_SIZE)-1;
+                // // u_int32_t proportion = (last_element - A)/10 * buckets_of_A[A/BUCKET_SIZE];
+                // // total_count += proportion;
 
-            // B > y
+            // B > X
             } else {
-                for (u_int32_t i = B/BUCKET_SIZE+1; i < BUCKETS; i++) {
-                    total_count += buckets_of_B[i];
-                }
+            //     for (u_int32_t i = B/BUCKET_SIZE+1; i < BUCKETS; i++) {
+            //         total_count += buckets_of_B[i];
+            //     }
                 
-                // Experimental
-                // u_int32_t last_element = (B/BUCKET_SIZE+1)*(BUCKET_SIZE)-1;
-                // u_int32_t proportion = (last_element - B)/10 * buckets_of_B[B/BUCKET_SIZE];
-                // total_count += proportion;
+            //     // Experimental
+            //     // u_int32_t last_element = (B/BUCKET_SIZE+1)*(BUCKET_SIZE)-1;
+            //     // u_int32_t proportion = (last_element - B)/10 * buckets_of_B[B/BUCKET_SIZE];
+            //     // total_count += proportion;
             }
 
-            return total_count*SAMPLING_CORRECTION;
+            // return total_count*SAMPLING_CORRECTION;
+
+            //Probabilistic (pure speculation of uniform distribution, no sampling correction needed, no sampled data used)
+            //return ( (MAX_VALUE - quals[0].value) / MAX_VALUE )*init_size;
+
+            return init_size/2;
         }
     } 
     
     if (quals.size() == 2) {
 
         // A = x AND B = y
-        if (quals[0].compareOp == 0 && quals[1].compareOp == 0) {
-            u_int32_t A = quals[0].value;
-            u_int32_t B = quals[1].value;
+        if (quals[0].compareOp == EQUAL && quals[1].compareOp == EQUAL) {
+            // u_int32_t A = quals[0].value;
+            // u_int32_t B = quals[1].value;
 
-            if (histogram[A/BIN_SIZE][B/BIN_SIZE] == 0) return 0;
+            // if (histogram[A/BIN_SIZE][B/BIN_SIZE] == 0) return 0;
+
+            //Probabilistic (very slim chance of 1 on uniform distribution)
             return 0;
         }
 
         // A = x AND B > y
-        if (quals[0].compareOp == 0 && quals[1].compareOp == 1) {
-            u_int32_t A = quals[0].value;
-            u_int32_t B = quals[1].value;
-            u_int32_t total_count = 0;
+        if (quals[0].compareOp == EQUAL && quals[1].compareOp == GREATER) {
+            // u_int32_t A = quals[0].value;
+            // u_int32_t B = quals[1].value;
+            // u_int32_t total_count = 0;
 
-            if (buckets_of_A[A/BUCKET_SIZE] == 0) return 0;
-            if (histogram[A/BIN_SIZE][B/BIN_SIZE] == 0) return 0;
+            // if (buckets_of_A[A/BUCKET_SIZE] == 0) return 0;
+            // if (histogram[A/BIN_SIZE][B/BIN_SIZE] == 0) return 0;
 
-            for (u_int32_t i = B/BIN_SIZE+1; i < BINS; i++) {
-                total_count += histogram[A/BIN_SIZE][i];
-            }
+            // for (u_int32_t i = B/BIN_SIZE+1; i < BINS; i++) {
+            //     total_count += histogram[A/BIN_SIZE][i];
+            // }
 
-            //total_count /= BIN_SIZE;
+            // //total_count /= BIN_SIZE;
 
-            return total_count*SAMPLING_CORRECTION;
+            // return total_count*SAMPLING_CORRECTION;
+
+            //Probabilistic (pure speculation of uniform distribution, no sampling correction needed, no sampled data used)
+
+            //return ( ( (MAX_VALUE - quals[1].value) / MAX_VALUE )*init_size ) / MAX_VALUE;
+
+            return init_size/MAX_VALUE;
         }
 
         // A > x AND B = y
-        if (quals[0].compareOp == 1 && quals[1].compareOp == 0) {
-            u_int32_t A = quals[0].value;
-            u_int32_t B = quals[1].value;
-            u_int32_t total_count = 0;
+        if (quals[0].compareOp == GREATER && quals[1].compareOp == EQUAL) {
+            // u_int32_t A = quals[0].value;
+            // u_int32_t B = quals[1].value;
+            // u_int32_t total_count = 0;
 
-            if (buckets_of_B[B/BUCKET_SIZE] == 0) return 0;
-            if (histogram[A/BIN_SIZE][B/BIN_SIZE] == 0) return 0;
+            // if (buckets_of_B[B/BUCKET_SIZE] == 0) return 0;
+            // if (histogram[A/BIN_SIZE][B/BIN_SIZE] == 0) return 0;
 
-            for (u_int32_t i = A/BIN_SIZE+1; i < BINS; i++) {
-                total_count += histogram[i][B/BIN_SIZE];
-            }
+            // for (u_int32_t i = A/BIN_SIZE+1; i < BINS; i++) {
+            //     total_count += histogram[i][B/BIN_SIZE];
+            // }
 
-            //total_count /= BIN_SIZE;
+            // //total_count /= BIN_SIZE;
 
-            return total_count*SAMPLING_CORRECTION;
+            // return total_count*SAMPLING_CORRECTION;
+
+            //Probabilistic (pure speculation of uniform distribution, no sampling correction needed, no sampled data used)
+            //return ( ( (MAX_VALUE - quals[0].value) / MAX_VALUE )*init_size ) / MAX_VALUE;
+
+            return init_size/MAX_VALUE;
         }
 
         // A > x AND B > y
-        if (quals[0].compareOp == 1 && quals[1].compareOp == 1) {
-            u_int32_t A = quals[0].value;
-            u_int32_t B = quals[1].value;
+        if (quals[0].compareOp == GREATER && quals[1].compareOp == GREATER) {
+            // u_int32_t A = quals[0].value;
+            // u_int32_t B = quals[1].value;
 
-            u_int32_t total_count = 0;
-            for (u_int32_t i = A/BIN_SIZE+1; i < BINS; i++) {
-                for (u_int32_t j = B/BIN_SIZE+1; j < BINS; j++) {
-                    total_count += histogram[i][j];
-                }
-            }
+            // u_int32_t total_count = 0;
+            // for (u_int32_t i = A/BIN_SIZE+1; i < BINS; i++) {
+            //     for (u_int32_t j = B/BIN_SIZE+1; j < BINS; j++) {
+            //         total_count += histogram[i][j];
+            //     }
+            // }
 
-            return total_count*SAMPLING_CORRECTION;
+            // return total_count*SAMPLING_CORRECTION;
+
+            //Probabilistic (pure speculation of uniform distribution, no sampling correction needed, no sampled data used)
+            //We calculate the area of the rectangle formed by the two points (A,B) and (MAX_VALUE,MAX_VALUE)
+            // double A_dimension = ( (MAX_VALUE - quals[0].value) / MAX_VALUE );
+            // double B_dimension = ( (MAX_VALUE - quals[1].value) / MAX_VALUE );
+            // return (A_dimension * B_dimension * init_size);
+
+            return init_size/2;
         }
     }
 }
@@ -169,6 +201,7 @@ void CEEngine::prepare()
 
 CEEngine::CEEngine(int num, DataExecuter *dataExecuter)
 {
+    init_size = num;
     // Implement your constructor here.
     this->dataExecuter = dataExecuter;
 
