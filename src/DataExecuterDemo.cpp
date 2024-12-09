@@ -12,12 +12,14 @@ DataExecuterDemo::DataExecuterDemo(int end, int count) : DataExecuter()
 {
     this->end = end;
     this->count = count;
-    for (int i = 0; i <= end; ++i) {
-        std::vector<int> tuple;
-        tuple.push_back(rand() % MAX_VALUE + 1);
-        tuple.push_back(rand() % MAX_VALUE + 1);
-        set.push_back(tuple);
-    }
+    //DISABLED: Random data generation
+    //MODE: Hardcoded data evaluation
+    // for (int i = 0; i <= end; ++i) {
+    //     std::vector<int> tuple;
+    //     tuple.push_back(rand() % MAX_VALUE + 1);
+    //     tuple.push_back(rand() % MAX_VALUE + 1);
+    //     set.push_back(tuple);
+    // }
 }
 
 std::vector<int> DataExecuterDemo::generateInsert()
