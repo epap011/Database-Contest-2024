@@ -52,7 +52,6 @@ void CEEngine::deleteTuple(const std::vector<int>& tuple, int tupleId)
 int CEEngine::query(const std::vector<CompareExpression>& quals)
 {
     // Implement your query logic here.
-    //return 0;
 
     u_int32_t ans = 0;
 
@@ -78,18 +77,21 @@ int CEEngine::query(const std::vector<CompareExpression>& quals)
                     total_count += buckets_of_A[i];
                 }
 
-                u_int32_t last_element = (A/BUCKET_SIZE+1)*(BUCKET_SIZE)-1;
-                u_int32_t proportion = (last_element - A)/10 * buckets_of_A[A/BUCKET_SIZE];
-                total_count += proportion;
+                // Experimental
+                // u_int32_t last_element = (A/BUCKET_SIZE+1)*(BUCKET_SIZE)-1;
+                // u_int32_t proportion = (last_element - A)/10 * buckets_of_A[A/BUCKET_SIZE];
+                // total_count += proportion;
+
             // B > y
             } else {
                 for (u_int32_t i = B/BUCKET_SIZE+1; i < BUCKETS; i++) {
                     total_count += buckets_of_B[i];
                 }
-
-                u_int32_t last_element = (B/BUCKET_SIZE+1)*(BUCKET_SIZE)-1;
-                u_int32_t proportion = (last_element - B)/10 * buckets_of_B[B/BUCKET_SIZE];
-                total_count += proportion;
+                
+                // Experimental
+                // u_int32_t last_element = (B/BUCKET_SIZE+1)*(BUCKET_SIZE)-1;
+                // u_int32_t proportion = (last_element - B)/10 * buckets_of_B[B/BUCKET_SIZE];
+                // total_count += proportion;
             }
 
             return total_count*SAMPLING_CORRECTION;
@@ -171,7 +173,7 @@ CEEngine::CEEngine(int num, DataExecuter *dataExecuter)
     this->dataExecuter = dataExecuter;
 
     // Memory for data structures
-    u_int32_t data_structures_memory = sizeof(histogram) + sizeof(buckets_of_A) + sizeof(buckets_of_B);
+    // u_int32_t data_structures_memory = sizeof(histogram) + sizeof(buckets_of_A) + sizeof(buckets_of_B);
 
     // Read all data from dataExecuter
     
