@@ -36,4 +36,28 @@ Each value in A, B requires 25 bits
 Histogram refinement (e.g., split buckets dynamically where skew is detected).
 Compressed data structures (e.g., count-min sketch, HyperLogLog) if exact frequencies aren't required.
 
+**Equality Queries**
+
+On the hardcoded version, an implementation of CountMinSketch (for A=x, B=x) and a BloomFilter (for A=x AND B=y) were tested.
+CMS works as good as return 1 (which is the average on a uniform distribution, 20mil tuples / 20mil value range)
+BF is worse than return 0, which makes sense, because (A=x AND B=y) for a *random* value is highly improbable, and most likely zero.
+We will test those two techniques in the future, using customized datasets, that contain tuples and respective queries that satisfy those parameters.
+There are testcases like that in the competition's evaluation system, almost certainly.
+
+For now, queries like A=x AND A>y, are mostly hopeless against zero, but we'll figure it out later.
+
+**Hardcoded Datasets**
+
+We must tidy up the hardcoded branch a bit.
+We must create some realistic hardcoded datasets (60mil tuples, 200k queries, no insert/delete). (AWS will be utilized)
+At least two with random (uniform) values, and two that will overrepresent cases A=x, B=x, A=x AND B=y, to test CMS & BF against zero.
+
+**Execution time improvement**
+
+After various failed and successful submissions, we have finally isolated the cost of our current estimators, which
+mostly work well for queries with only Greater comparison (A>x, B>x, A>x AND B>y).
+Our runtime is off limits. In order to test the current implementation (histogram & frequency arrays), we have to
+create multiple copies with half the size.
+This only increases the insertion by a little (from O(3) to about O(15)) and improves traversal logarithmically, from 270k to 18 traversals per query.
+This is our next best step, to submit something that does actual computations and produces a better score.
 ---
