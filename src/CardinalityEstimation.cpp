@@ -3,6 +3,7 @@
 //
 #include <common/Root.h>
 #include <CardinalityEstimation.h>
+#include <BloomFilter.h>
 #include <fstream>
 
 #define MEM_LIMIT_BYTES 4194304
@@ -20,6 +21,7 @@
 u_int32_t histogram[BINS][BINS] = {0}; // 513 * 513 * 4 = 1,052,676 Bytes = 1,003 MB
 u_int32_t buckets_of_A[BUCKETS] = {0}; // 259741 * 4 = 1,038,964 Bytes = 0.99 MB  | bins per bucket = 77
 u_int32_t buckets_of_B[BUCKETS] = {0}; // 259741 * 4 = 1,038,964 Bytes = 0.99 MB  | bins per bucket = 77
+BloomFilter bloomFilter;
 
 // Total Memory for data structure: 1,003 + 0.99 + 0.99 = 2.97 MB
 
@@ -33,6 +35,7 @@ void CEEngine::insertTuple(const std::vector<int>& tuple)
     histogram[A/BIN_SIZE][B/BIN_SIZE]++;
     buckets_of_A[A/BUCKET_SIZE]++;
     buckets_of_B[B/BUCKET_SIZE]++;
+    bloomFilter.insert(A, B);
 }
 
 void CEEngine::deleteTuple(const std::vector<int>& tuple, int tupleId)
@@ -50,24 +53,21 @@ void CEEngine::deleteTuple(const std::vector<int>& tuple, int tupleId)
 int CEEngine::query(const std::vector<CompareExpression>& quals)
 {
     // Implement your query logic here.
-
-    u_int32_t ans = 0;
+    u_int32_t A, B;
+    u_int32_t total_count = 0;
 
     if (quals.size() == 1) {
+        A = quals[0].value;
+        B = quals[0].value;
         // A = x OR B = y | // Time Complexity: O(1)
         if (quals[0].compareOp == 0) {
-            u_int32_t A = quals[0].value;
-            u_int32_t B = quals[0].value;
-
+            return 1;
             return quals[0].columnIdx == 0 ? (buckets_of_A[A/BUCKET_SIZE]/BUCKET_SIZE)*(SAMPLING_CORRECTION) : (buckets_of_B[B/BUCKET_SIZE]/BUCKET_SIZE)*(SAMPLING_CORRECTION);
         }
 
         // A > x OR B > y | // Time Complexity: O(|Buckets|)
         if (quals[0].compareOp == 1) {
-            u_int32_t A = quals[0].value;
-            u_int32_t B = quals[0].value;
             
-            u_int32_t total_count = 0;
 
             // A > x
             if (quals[0].columnIdx == 0) {
@@ -93,25 +93,35 @@ int CEEngine::query(const std::vector<CompareExpression>& quals)
         }
     } 
     
-    if (quals.size() == 2) {
+    else if (quals.size() == 2) {
+
+        A = quals[0].value;
+        B = quals[1].value;
+        
+        u_int32_t A_bin = A/BIN_SIZE;
+        double A_multiplier = ((A_bin+1)*(BIN_SIZE) - A)/BIN_SIZE;
+
+        u_int32_t B_bin = B/BIN_SIZE;
+        double B_multiplier = ((B_bin+1)*(BIN_SIZE) - B)/BIN_SIZE;
 
         //A = x AND B = y
         if (quals[0].compareOp == 0 && quals[1].compareOp == 0) {
-            u_int32_t A = quals[0].value;
-            u_int32_t B = quals[1].value;
 
             if (histogram[A/BIN_SIZE][B/BIN_SIZE] == 0) return 0;
-            return 0;
+            
+            return (bloomFilter.query(A, B) ? 1 : 0);
         }
 
         // // A = x AND B > y
         if (quals[0].compareOp == 0 && quals[1].compareOp == 1) {
-            u_int32_t A = quals[0].value;
-            u_int32_t B = quals[1].value;
-            u_int32_t total_count = 0;
+            return 0;
 
             if (buckets_of_A[A/BUCKET_SIZE] == 0) return 0;
-            if (histogram[A/BIN_SIZE][B/BIN_SIZE] == 0) return 0;
+            //The following is wrong, because B>y might still exist in bins after B/BIN_SIZE
+            //if (histogram[A/BIN_SIZE][B/BIN_SIZE] == 0) return 0;
+
+            //First bin
+            total_count += histogram[A/BIN_SIZE][B/BIN_SIZE]*B_multiplier;
 
             for (u_int32_t i = B/BIN_SIZE+1; i < BINS; i++) {
                 total_count += histogram[A/BIN_SIZE][i];
@@ -122,12 +132,14 @@ int CEEngine::query(const std::vector<CompareExpression>& quals)
 
         // // A > x AND B = y
         if (quals[0].compareOp == 1 && quals[1].compareOp == 0) {
-            u_int32_t A = quals[0].value;
-            u_int32_t B = quals[1].value;
-            u_int32_t total_count = 0;
-
+            return 1;
             if (buckets_of_B[B/BUCKET_SIZE] == 0) return 0;
-            if (histogram[A/BIN_SIZE][B/BIN_SIZE] == 0) return 0;
+
+            //The following is wrong, because A>x might still exist in bins after A/BIN_SIZE
+            //if (histogram[A/BIN_SIZE][B/BIN_SIZE] == 0) return 0;
+
+            //First bin
+            total_count += histogram[A/BIN_SIZE][B/BIN_SIZE]*A_multiplier;
 
             for (u_int32_t i = A/BIN_SIZE+1; i < BINS; i++) {
                 total_count += histogram[i][B/BIN_SIZE];
@@ -138,16 +150,26 @@ int CEEngine::query(const std::vector<CompareExpression>& quals)
 
         // // A > x AND B > y
         if (quals[0].compareOp == 1 && quals[1].compareOp == 1) {
-            u_int32_t A = quals[0].value;
-            u_int32_t B = quals[1].value;
+            
+            // A bin column
 
-            u_int32_t total_count = 0;
+            for (u_int32_t i = B/BIN_SIZE; i < BINS; i++) {
+                total_count += histogram[A/BIN_SIZE][i]*A_multiplier;
+            }
+
+            // B bin line
+            // here, i will be A/BIN_SIZE+1 because we already counted the first bin
+
+            for (u_int32_t i = A/BIN_SIZE+1; i < BINS; i++) {
+                total_count += histogram[i][B/BIN_SIZE]*B_multiplier;
+            }
+
+            // Rectangle after bin corresponding to A and B
             for (u_int32_t i = A/BIN_SIZE+1; i < BINS; i++) {
                 for (u_int32_t j = B/BIN_SIZE+1; j < BINS; j++) {
                     total_count += histogram[i][j];
                 }
             }
-
             return total_count*(SAMPLING_CORRECTION);
         }
     }
@@ -166,6 +188,9 @@ CEEngine::CEEngine(int num, DataExecuter *dataExecuter)
     // Read all data from dataExecuter
     std::vector<std::vector<int>> data;
 
+    //Bloom Filter
+    bloomFilter = BloomFilter(4 * 1024 * 1024 * 8, 5);
+
     for (int i = 0; i < num; i+=OFFSET*(1-SAMPLING_RATE)) {
         //dataExecuter->readTuples(i, 1, data);
         //debugging
@@ -178,6 +203,7 @@ CEEngine::CEEngine(int num, DataExecuter *dataExecuter)
             histogram[A/BIN_SIZE][B/BIN_SIZE]++;
             buckets_of_A[A/BUCKET_SIZE]++;
             buckets_of_B[B/BUCKET_SIZE]++;
+            bloomFilter.insert(A, B);
         }
 
         data.clear();
