@@ -4,6 +4,7 @@
 #include <common/Root.h>
 #include <CardinalityEstimation.h>
 #include <BloomFilter.h>
+#include <CountMinSketch.h>
 #include <fstream>
 
 #define MEM_LIMIT_BYTES 4194304
@@ -21,7 +22,10 @@
 u_int32_t histogram[BINS][BINS] = {0}; // 513 * 513 * 4 = 1,052,676 Bytes = 1,003 MB
 u_int32_t buckets_of_A[BUCKETS] = {0}; // 259741 * 4 = 1,038,964 Bytes = 0.99 MB  | bins per bucket = 77
 u_int32_t buckets_of_B[BUCKETS] = {0}; // 259741 * 4 = 1,038,964 Bytes = 0.99 MB  | bins per bucket = 77
-BloomFilter bloomFilter;
+
+BloomFilter bloomFilter = BloomFilter(4 * 1024 * 1024 * 8, 5);
+CountMinSketch CMS_a = CountMinSketch(16000, 16);
+CountMinSketch CMS_b = CountMinSketch(16000, 16);
 
 // Total Memory for data structure: 1,003 + 0.99 + 0.99 = 2.97 MB
 
@@ -36,6 +40,8 @@ void CEEngine::insertTuple(const std::vector<int>& tuple)
     buckets_of_A[A/BUCKET_SIZE]++;
     buckets_of_B[B/BUCKET_SIZE]++;
     bloomFilter.insert(A, B);
+    CMS_a.insert(A);
+    CMS_b.insert(B);
 }
 
 void CEEngine::deleteTuple(const std::vector<int>& tuple, int tupleId)
@@ -61,13 +67,17 @@ int CEEngine::query(const std::vector<CompareExpression>& quals)
         B = quals[0].value;
         // A = x OR B = y | // Time Complexity: O(1)
         if (quals[0].compareOp == 0) {
-            return 1;
-            return quals[0].columnIdx == 0 ? (buckets_of_A[A/BUCKET_SIZE]/BUCKET_SIZE)*(SAMPLING_CORRECTION) : (buckets_of_B[B/BUCKET_SIZE]/BUCKET_SIZE)*(SAMPLING_CORRECTION);
+            //  return 1; //20 mil / 20 mil
+            // return quals[0].columnIdx == 0 ? (buckets_of_A[A/BUCKET_SIZE]/BUCKET_SIZE)*(SAMPLING_CORRECTION) : (buckets_of_B[B/BUCKET_SIZE]/BUCKET_SIZE)*(SAMPLING_CORRECTION);
+            if (quals[0].columnIdx == 0) {
+                return CMS_a.query(A);
+            } else {
+                return CMS_b.query(B);
+            }
         }
 
         // A > x OR B > y | // Time Complexity: O(|Buckets|)
         if (quals[0].compareOp == 1) {
-            
 
             // A > x
             if (quals[0].columnIdx == 0) {
@@ -110,6 +120,7 @@ int CEEngine::query(const std::vector<CompareExpression>& quals)
             if (histogram[A/BIN_SIZE][B/BIN_SIZE] == 0) return 0;
             
             return (bloomFilter.query(A, B) ? 1 : 0);
+            // return 0;
         }
 
         // // A = x AND B > y
@@ -132,7 +143,7 @@ int CEEngine::query(const std::vector<CompareExpression>& quals)
 
         // // A > x AND B = y
         if (quals[0].compareOp == 1 && quals[1].compareOp == 0) {
-            return 1;
+            return 0;
             if (buckets_of_B[B/BUCKET_SIZE] == 0) return 0;
 
             //The following is wrong, because A>x might still exist in bins after A/BIN_SIZE
@@ -150,7 +161,6 @@ int CEEngine::query(const std::vector<CompareExpression>& quals)
 
         // // A > x AND B > y
         if (quals[0].compareOp == 1 && quals[1].compareOp == 1) {
-            
             // A bin column
 
             for (u_int32_t i = B/BIN_SIZE; i < BINS; i++) {
@@ -188,9 +198,6 @@ CEEngine::CEEngine(int num, DataExecuter *dataExecuter)
     // Read all data from dataExecuter
     std::vector<std::vector<int>> data;
 
-    //Bloom Filter
-    bloomFilter = BloomFilter(4 * 1024 * 1024 * 8, 5);
-
     for (int i = 0; i < num; i+=OFFSET*(1-SAMPLING_RATE)) {
         //dataExecuter->readTuples(i, 1, data);
         //debugging
@@ -204,6 +211,8 @@ CEEngine::CEEngine(int num, DataExecuter *dataExecuter)
             buckets_of_A[A/BUCKET_SIZE]++;
             buckets_of_B[B/BUCKET_SIZE]++;
             bloomFilter.insert(A, B);
+            CMS_a.insert(A);
+            CMS_b.insert(B);
         }
 
         data.clear();
