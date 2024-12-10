@@ -17,7 +17,7 @@
 //259740.25974026
 //38986.354775828
 
-u_int32_t histogram512[BINS][BINS] = {0}; // 513 * 513 * 4 = 1,052,676 Bytes = 1,003 MB
+u_int32_t histogram512[BINS][BINS] = {0}; // 512 * 512 * 4 = 1,048,576 Bytes = 1 MB
 u_int32_t histogram256[BINS/2][BINS/2] = {0}; // 257 * 257 * 4 = 264,196 Bytes = 0.25 MB
 u_int32_t histogram128[BINS/4][BINS/4] = {0}; // 129 * 129 * 4 = 66,516 Bytes = 0.06 MB
 u_int32_t histogram64[BINS/8][BINS/8] = {0}; // 65 * 65 * 4 = 16,900 Bytes = 0.02 MB
@@ -25,6 +25,7 @@ u_int32_t histogram32[BINS/16][BINS/16] = {0}; // 33 * 33 * 4 = 4,356 Bytes = 0.
 u_int32_t histogram16[BINS/32][BINS/32] = {0}; // 17 * 17 * 4 = 1,108 Bytes = 0.001 MB
 u_int32_t histogram8[BINS/64][BINS/64] = {0}; // 9 * 9 * 4 = 324 Bytes = 0.0003 MB
 u_int32_t histogram4[BINS/128][BINS/128] = {0}; // 5 * 5 * 4 = 100 Bytes = 0.0001 MB
+//Total Memory for histograms: 1.3381 MB
 
 void* histogram[8] = {histogram512, histogram256, histogram128, histogram64, histogram32, histogram16, histogram8, histogram4};
 
@@ -41,9 +42,13 @@ void CEEngine::insertTuple(const std::vector<int>& tuple)
 
     u_int32_t A = tuple[0];
     u_int32_t B = tuple[1];
+
+    int index_a, index_b;
     int size = 512;
     for(int i = 0; i < 8; i++) {
-        ((u_int32_t(*)[size])histogram[i])[A/(MAX_VALUE/size)][B/(MAX_VALUE/size)]++;
+        index_a = A/(MAX_VALUE/size) < size ? A/(MAX_VALUE/size) : size-1;
+        index_b = B/(MAX_VALUE/size) < size ? B/(MAX_VALUE/size) : size-1;
+        ((u_int32_t(*)[size])histogram[i])[index_a][index_b]++;
         size /= 2;
     }
     // histogram512[A/BIN_SIZE][B/BIN_SIZE]++;
@@ -61,9 +66,12 @@ void CEEngine::deleteTuple(const std::vector<int>& tuple, int tupleId)
     u_int32_t A = tuple[0];
     u_int32_t B = tuple[1];
 
+    int index_a, index_b;
     int size = 512;
     for(int i = 0; i < 8; i++) {
-        ((u_int32_t(*)[size])histogram[i])[A/(MAX_VALUE/size)][B/(MAX_VALUE/size)]--;
+        index_a = A/(MAX_VALUE/size) < size ? A/(MAX_VALUE/size) : size-1;
+        index_b = B/(MAX_VALUE/size) < size ? B/(MAX_VALUE/size) : size-1;
+        ((u_int32_t(*)[size])histogram[i])[index_a][index_b]--;
         size /= 2;
     }
     // histogram512[A/BIN_SIZE][B/BIN_SIZE]--;
@@ -90,6 +98,7 @@ int CEEngine::query(const std::vector<CompareExpression>& quals)
         }
 
         // A > x OR B > x | // Time Complexity: O(|Buckets|)
+        
         if (quals[0].compareOp == GREATER) {
             u_int32_t A = quals[0].value;
             u_int32_t B = quals[0].value;
@@ -97,11 +106,15 @@ int CEEngine::query(const std::vector<CompareExpression>& quals)
             u_int32_t total_count = 0;
 
             // A > x
+            int start_i = A/BUCKET_SIZE+1;
+            int partial_cnt = 0;
+            u_int32_t i = start_i;
             if (quals[0].columnIdx == 0) {
-                for (u_int32_t i = A/BUCKET_SIZE+1; i < BUCKETS; i++) {
-                    total_count += buckets_of_A[i];
+                for (i; (i < BUCKETS && i<(start_i+30)); i++) {
+                    partial_cnt += buckets_of_A[i];
                 }
 
+                total_count += partial_cnt*( (double)(BUCKETS - start_i)/(i - start_i) );
                 // Experimental
                 // u_int32_t last_element = (A/BUCKET_SIZE+1)*(BUCKET_SIZE)-1;
                 // u_int32_t proportion = (last_element - A)/10 * buckets_of_A[A/BUCKET_SIZE];
@@ -109,10 +122,14 @@ int CEEngine::query(const std::vector<CompareExpression>& quals)
 
             // B > X
             } else {
-                for (u_int32_t i = B/BUCKET_SIZE+1; i < BUCKETS; i++) {
-                    total_count += buckets_of_B[i];
+                int start_i = B/BUCKET_SIZE+1;
+                int partial_cnt = 0;
+                u_int32_t i = start_i;
+                for (i; (i < BUCKETS && i<(start_i+30)); i++) {
+                    partial_cnt += buckets_of_B[i];
                 }
                 
+                total_count += partial_cnt*( (double)(BUCKETS - start_i)/(i - start_i) );
                 // Experimental
                 // u_int32_t last_element = (B/BUCKET_SIZE+1)*(BUCKET_SIZE)-1;
                 // u_int32_t proportion = (last_element - B)/10 * buckets_of_B[B/BUCKET_SIZE];
@@ -193,10 +210,16 @@ int CEEngine::query(const std::vector<CompareExpression>& quals)
             u_int32_t A = quals[0].value;
             u_int32_t B = quals[1].value;
 
+            //Test with hardcoded histogram32[][]
             u_int32_t total_count = 0;
-            for (u_int32_t i = A/BIN_SIZE+1; i < BINS; i++) {
-                for (u_int32_t j = B/BIN_SIZE+1; j < BINS; j++) {
-                    total_count += ((u_int32_t(*)[BINS])histogram[0])[i][j];
+            int index_a = A/(MAX_VALUE/32) < 32 ? A/(MAX_VALUE/32) : 31;
+            int index_b = B/(MAX_VALUE/32) < 32 ? B/(MAX_VALUE/32) : 31;
+            // Stoned test for redundant buckets
+            total_count += ((u_int32_t(*)[32])histogram[4])[index_a][index_b] *((32 - index_a)+(32 - index_b))/2;
+            
+            for (u_int32_t i = A/(MAX_VALUE/32)+1; i < BINS/16; i++) {
+                for (u_int32_t j = B/(MAX_VALUE/32)+1; j < BINS/16; j++) {
+                    total_count += ((u_int32_t(*)[32])histogram[4])[i][j];
                     // total_count += histogram512[i][j];
                 }
             }
@@ -242,8 +265,11 @@ CEEngine::CEEngine(int num, DataExecuter *dataExecuter)
             B = data[j][1];
 
             int size = 512;
-            for(int i = 0; i < 8; i++) {
-                ((u_int32_t(*)[size])histogram[i])[A/(MAX_VALUE/size)][B/(MAX_VALUE/size)]++;
+            int index_a, index_b;
+            for(int i = 0; i < 8; i++) {    
+            index_a = A/(MAX_VALUE/size) < size ? A/(MAX_VALUE/size) : size-1;
+            index_b = B/(MAX_VALUE/size) < size ? B/(MAX_VALUE/size) : size-1;
+                ((u_int32_t(*)[size])histogram[i])[index_a][index_b]++;
                 size /= 2;
             }
             // histogram512[A/BIN_SIZE][B/BIN_SIZE]++;
