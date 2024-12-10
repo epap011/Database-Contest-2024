@@ -71,15 +71,16 @@ void CEEngine::deleteTuple(const std::vector<int>& tuple, int tupleId)
     for(int i = 0; i < 8; i++) {
         index_a = A/(MAX_VALUE/size) < size ? A/(MAX_VALUE/size) : size-1;
         index_b = B/(MAX_VALUE/size) < size ? B/(MAX_VALUE/size) : size-1;
-        ((u_int32_t(*)[size])histogram[i])[index_a][index_b]--;
+        if(((u_int32_t(*)[size])histogram[i])[index_a][index_b])
+            ((u_int32_t(*)[size])histogram[i])[index_a][index_b]--;
         size /= 2;
     }
     // histogram512[A/BIN_SIZE][B/BIN_SIZE]--;
 
-    buckets_of_A[A/BUCKET_SIZE]--;
-    buckets_of_B[B/BUCKET_SIZE]--;
+    if (buckets_of_A[A/BUCKET_SIZE]) buckets_of_A[A/BUCKET_SIZE]--;
+    if (buckets_of_B[B/BUCKET_SIZE]) buckets_of_B[B/BUCKET_SIZE]--;
 
-    init_size--;
+    if (init_size) init_size--;
 }
 
 int CEEngine::query(const std::vector<CompareExpression>& quals)
@@ -216,7 +217,7 @@ int CEEngine::query(const std::vector<CompareExpression>& quals)
             int index_b = B/(MAX_VALUE/32) < 32 ? B/(MAX_VALUE/32) : 31;
             // Stoned test for redundant buckets
             total_count += ((u_int32_t(*)[32])histogram[4])[index_a][index_b] *((32 - index_a)+(32 - index_b))/2;
-            
+
             for (u_int32_t i = A/(MAX_VALUE/32)+1; i < BINS/16; i++) {
                 for (u_int32_t j = B/(MAX_VALUE/32)+1; j < BINS/16; j++) {
                     total_count += ((u_int32_t(*)[32])histogram[4])[i][j];
