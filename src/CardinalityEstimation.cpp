@@ -80,8 +80,9 @@ void CEEngine::insertTuple(const std::vector<int>& tuple)
     u_int32_t A = tuple[0];
     u_int32_t B = tuple[1];
 
-    int index_a, index_b;
-    int size = 512;
+    int index_a, index_b, size;
+    
+    size = 512;
     for(int i = 0; i < 8; i++) {
         index_a = A/(MAX_VALUE/size) < size ? A/(MAX_VALUE/size) : size-1;
         index_b = B/(MAX_VALUE/size) < size ? B/(MAX_VALUE/size) : size-1;
@@ -90,8 +91,17 @@ void CEEngine::insertTuple(const std::vector<int>& tuple)
     }
     // histogram512[A/BIN_SIZE][B/BIN_SIZE]++;
 
-    buckets_of_A1[A/BUCKET_SIZE]++;
-    buckets_of_B1[B/BUCKET_SIZE]++;
+    // buckets_of_A1[A/BUCKET_SIZE]++;
+    // buckets_of_B1[B/BUCKET_SIZE]++;
+
+    size = BUCKETS;
+    for (int i = 0; i < 16; i++) {
+        index_a = A/(MAX_VALUE/size) < size ? A/(MAX_VALUE/size) : size-1;
+        index_b = B/(MAX_VALUE/size) < size ? B/(MAX_VALUE/size) : size-1;
+        ((u_int32_t*)buckets_of_A[i])[index_a]++;
+        ((u_int32_t*)buckets_of_B[i])[index_b]++;
+        size /= 2;
+    }
 
     init_size++;
 }
@@ -103,8 +113,8 @@ void CEEngine::deleteTuple(const std::vector<int>& tuple, int tupleId)
     u_int32_t A = tuple[0];
     u_int32_t B = tuple[1];
 
-    int index_a, index_b;
-    int size = 512;
+    int index_a, index_b, size;
+    size = 512;
     for(int i = 0; i < 8; i++) {
         index_a = A/(MAX_VALUE/size) < size ? A/(MAX_VALUE/size) : size-1;
         index_b = B/(MAX_VALUE/size) < size ? B/(MAX_VALUE/size) : size-1;
@@ -114,14 +124,18 @@ void CEEngine::deleteTuple(const std::vector<int>& tuple, int tupleId)
     }
     // histogram512[A/BIN_SIZE][B/BIN_SIZE]--;
 
-    if (buckets_of_A1[A/BUCKET_SIZE]) buckets_of_A1[A/BUCKET_SIZE]--;
-    if (buckets_of_B1[B/BUCKET_SIZE]) buckets_of_B1[B/BUCKET_SIZE]--;
+    // if (buckets_of_A1[A/BUCKET_SIZE]) buckets_of_A1[A/BUCKET_SIZE]--;
+    // if (buckets_of_B1[B/BUCKET_SIZE]) buckets_of_B1[B/BUCKET_SIZE]--;
 
-    // for (int i = 0; i < 16; i++){
-    //     if (((u_int32_t(*)[BUCKETS])buckets_of_A)[A/BUCKET_SIZE]) ((u_int32_t(*)[BUCKETS])buckets_of_A)[A/BUCKET_SIZE]--;
-    //     if (((u_int32_t(*)[BUCKETS])buckets_of_B)[B/BUCKET_SIZE]) ((u_int32_t(*)[BUCKETS])buckets_of_B)[B/BUCKET_SIZE]--;
-    // }
-
+    size = BUCKETS;
+    for (int i = 0; i < 16; i++){
+        index_a = A/(MAX_VALUE/size) < size ? A/(MAX_VALUE/size) : size-1;
+        index_b = B/(MAX_VALUE/size) < size ? B/(MAX_VALUE/size) : size-1;
+        if( ((u_int32_t*)buckets_of_A[i])[index_a]) ((u_int32_t*)buckets_of_A[i])[index_a]--;
+        if( ((u_int32_t*)buckets_of_B[i])[index_b]) ((u_int32_t*)buckets_of_B[i])[index_b]--;
+        size /= 2;
+    }
+    
     if (init_size) init_size--;
 }
 
@@ -151,9 +165,21 @@ int CEEngine::query(const std::vector<CompareExpression>& quals)
             // A > x
             u_int32_t i = A/BUCKET_SIZE+1 < BUCKETS ? A/BUCKET_SIZE+1 : BUCKETS-1;
             if (quals[0].columnIdx == 0) {
-                for (i; i < BUCKETS; i++) {
-                    total_count += buckets_of_A1[i];
+
+                // for (i; i < BUCKETS; i++) {
+                //     total_count += buckets_of_A1[i];
+                // }
+
+                int size = BUCKETS;
+                int index = A/BUCKET_SIZE+1 < size ? A/BUCKET_SIZE+1 : size-1;
+                for(int i=0; i < 15; i++) {
+                    if(index % 2 == 1)
+                        total_count += ((u_int32_t*)buckets_of_A[i])[index++];
+                    index /= 2;
                 }
+                for(int i = index;i<4;i++)
+                    total_count += ((u_int32_t*)buckets_of_A[15])[i];
+
                 // Experimental
                 // u_int32_t last_element = (A/BUCKET_SIZE+1)*(BUCKET_SIZE)-1;
                 // u_int32_t proportion = (last_element - A)/10 * buckets_of_A1[A/BUCKET_SIZE];
@@ -161,10 +187,21 @@ int CEEngine::query(const std::vector<CompareExpression>& quals)
 
             // B > X
             } else {
-                u_int32_t i = B/BUCKET_SIZE+1 < BUCKETS ? B/BUCKET_SIZE+1 : BUCKETS-1;
-                for (i; i < BUCKETS; i++) {
-                    total_count += buckets_of_B1[i];
+                // u_int32_t i = B/BUCKET_SIZE+1 < BUCKETS ? B/BUCKET_SIZE+1 : BUCKETS-1;
+                // for (i; i < BUCKETS; i++) {
+                //     total_count += buckets_of_B1[i];
+                // }
+
+                int size = BUCKETS;
+                int index = B/BUCKET_SIZE+1 < size ? B/BUCKET_SIZE+1 : size-1;
+                for(int i=0; i < 15; i++) {
+                    if(index % 2 == 1)
+                        total_count += ((u_int32_t*)buckets_of_B[i])[index++];
+                    index /= 2;
                 }
+                for(int i = index;i<4;i++)
+                    total_count += ((u_int32_t*)buckets_of_B[15])[i];
+
                 // Experimental
                 // u_int32_t last_element = (B/BUCKET_SIZE+1)*(BUCKET_SIZE)-1;
                 // u_int32_t proportion = (last_element - B)/10 * buckets_of_B1[B/BUCKET_SIZE];
@@ -214,7 +251,8 @@ int CEEngine::query(const std::vector<CompareExpression>& quals)
 
             //return ( ( (MAX_VALUE - quals[1].value) / MAX_VALUE )*init_size ) / MAX_VALUE;
 
-            return 1;
+            //Proven best approximation, so far
+            return init_size/MAX_VALUE;
         }
 
         // A > x AND B = y
@@ -237,7 +275,8 @@ int CEEngine::query(const std::vector<CompareExpression>& quals)
             //Probabilistic (pure speculation of uniform distribution, no sampling correction needed, no sampled data used)
             //return ( ( (MAX_VALUE - quals[0].value) / MAX_VALUE )*init_size ) / MAX_VALUE;
 
-            return 1;
+            //Proven best approximation, so far
+            return init_size/MAX_VALUE;
         }
 
         // A > x AND B > y
@@ -248,14 +287,13 @@ int CEEngine::query(const std::vector<CompareExpression>& quals)
             u_int32_t total_count = 0;
 
             // Stoned test for redundant buckets
-            int index_a = A/(MAX_VALUE/32) < 32 ? A/(MAX_VALUE/32) : 31;
-            int index_b = B/(MAX_VALUE/32) < 32 ? B/(MAX_VALUE/32) : 31;
-            total_count += ((u_int32_t(*)[512])histogram[0])[index_a][index_b] *((32 - index_a)+(32 - index_b))/2;
+            int index_a = A/(MAX_VALUE/64) < 64 ? A/(MAX_VALUE/64) : 63;
+            int index_b = B/(MAX_VALUE/64) < 64 ? B/(MAX_VALUE/64) : 63;
+            total_count += ((u_int32_t(*)[64])histogram[3])[index_a][index_b] *((64 - index_a)+(64 - index_b))/2;
 
-            for (u_int32_t i = A/(MAX_VALUE/512)+1; i < BINS; i++) {
-                for (u_int32_t j = B/(MAX_VALUE/512)+1; j < BINS; j++) {
-                    total_count += ((u_int32_t(*)[512])histogram[0])[i][j];
-                    // total_count += histogram512[i][j];
+            for (u_int32_t i = A/(MAX_VALUE/64)+1; i < BINS/8; i++) {
+                for (u_int32_t j = B/(MAX_VALUE/64)+1; j < BINS/8; j++) {
+                    total_count += ((u_int32_t(*)[64])histogram[3])[i][j];
                 }
             }
 
@@ -299,20 +337,24 @@ CEEngine::CEEngine(int num, DataExecuter *dataExecuter)
             A = data[j][0];
             B = data[j][1];
 
-            int size = 512;
-            int index_a, index_b;
+            int index_a, index_b, size;
 
+            size = 512;
             for(int i = 0; i < 8; i++) {    
             index_a = A/(MAX_VALUE/size) < size ? A/(MAX_VALUE/size) : size-1;
             index_b = B/(MAX_VALUE/size) < size ? B/(MAX_VALUE/size) : size-1;
                 ((u_int32_t(*)[size])histogram[i])[index_a][index_b]++;
                 size /= 2;
             }
-            // histogram512[A/BIN_SIZE][B/BIN_SIZE]++;
-            index_a = A/BUCKET_SIZE < BUCKETS ? A/BUCKET_SIZE : BUCKETS-1;
-            index_b = B/BUCKET_SIZE < BUCKETS ? B/BUCKET_SIZE : BUCKETS-1;
-            buckets_of_A1[index_a]++;
-            buckets_of_B1[index_b]++;
+
+            size = BUCKETS;
+            for (int i = 0; i < 16; i++) {
+                index_a = A/(MAX_VALUE/size) < size ? A/(MAX_VALUE/size) : size-1;
+                index_b = B/(MAX_VALUE/size) < size ? B/(MAX_VALUE/size) : size-1;
+                ((u_int32_t*)buckets_of_A[i])[index_a]++;
+                ((u_int32_t*)buckets_of_B[i])[index_b]++;
+                size /= 2;
+            }
 
             // //Memory of data
             // u_int32_t vector_data = 0;
