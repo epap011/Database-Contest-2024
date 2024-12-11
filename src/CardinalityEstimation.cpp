@@ -6,10 +6,10 @@
 
 #define MEM_LIMIT_BYTES 4194304
 #define MAX_VALUE 20000000
-#define BUCKETS 259741
+#define BUCKETS 131072
+#define BUCKET_SIZE 152
 #define BINS 512
 #define BIN_SIZE 39062
-#define BUCKET_SIZE 77
 #define OFFSET 500000
 #define SAMPLING_RATE 0.01
 #define SAMPLING_CORRECTION 100
@@ -29,8 +29,45 @@ u_int32_t histogram4[BINS/128][BINS/128] = {0}; // 5 * 5 * 4 = 100 Bytes = 0.000
 
 void* histogram[8] = {histogram512, histogram256, histogram128, histogram64, histogram32, histogram16, histogram8, histogram4};
 
-u_int32_t buckets_of_A[BUCKETS] = {0}; // 259741 * 4 = 1,038,964 Bytes = 0.99 MB  | bins per bucket = 77
-u_int32_t buckets_of_B[BUCKETS] = {0}; // 259741 * 4 = 1,038,964 Bytes = 0.99 MB  | bins per bucket = 77
+u_int32_t buckets_of_A1[BUCKETS] = {0}; // 131072 * 4 = 524288 Bytes = 0.5 MB
+u_int32_t buckets_of_A2[BUCKETS/2] = {0}; // 65536 * 4 = 262144 Bytes = 0.25 MB
+u_int32_t buckets_of_A3[BUCKETS/4] = {0}; // 32768 * 4 = 131072 Bytes = 0.125 MB
+u_int32_t buckets_of_A4[BUCKETS/8] = {0}; // 16384 * 4 = 65536 Bytes = 0.0625 MB
+u_int32_t buckets_of_A5[BUCKETS/16] = {0}; // 8192 * 4 = 32768 Bytes = 0.03125 MB
+u_int32_t buckets_of_A6[BUCKETS/32] = {0}; // 4096 * 4 = 16384 Bytes = 0.015625 MB
+u_int32_t buckets_of_A7[BUCKETS/64] = {0}; // 2048 * 4 = 8192 Bytes = 0.0078125 MB
+u_int32_t buckets_of_A8[BUCKETS/128] = {0}; // 1024 * 4 = 4096 Bytes = 0.00390625 MB
+u_int32_t buckets_of_A9[BUCKETS/256] = {0}; // 512 * 4 = 2048 Bytes = 0.001953125 MB
+u_int32_t buckets_of_A10[BUCKETS/512] = {0}; // 256 * 4 = 1024 Bytes = 0.0009765625 MB
+u_int32_t buckets_of_A11[BUCKETS/1024] = {0}; // 128 * 4 = 512 Bytes = 0.00048828125 MB
+u_int32_t buckets_of_A12[BUCKETS/2048] = {0}; // 64 * 4 = 256 Bytes = 0.000244140625 MB
+u_int32_t buckets_of_A13[BUCKETS/4096] = {0}; // 32 * 4 = 128 Bytes = 0.0001220703125 MB
+u_int32_t buckets_of_A14[BUCKETS/8192] = {0}; // 16 * 4 = 64 Bytes = 0.00006103515625 MB
+u_int32_t buckets_of_A15[BUCKETS/16384] = {0}; // 8 * 4 = 32 Bytes = 0.000030517578125 MB
+u_int32_t buckets_of_A16[BUCKETS/32768] = {0}; // 4 * 4 = 16 Bytes = 0.0000152587890625 MB
+//Total Memory for buckets_of_A: ~1 MB
+
+void *buckets_of_A[16] = {buckets_of_A1, buckets_of_A2, buckets_of_A3, buckets_of_A4, buckets_of_A5, buckets_of_A6, buckets_of_A7, buckets_of_A8, buckets_of_A9, buckets_of_A10, buckets_of_A11, buckets_of_A12, buckets_of_A13, buckets_of_A14, buckets_of_A15, buckets_of_A16};
+
+u_int32_t buckets_of_B1[BUCKETS] = {0}; // 131072 * 4 = 524288 Bytes = 0.5 MB
+u_int32_t buckets_of_B2[BUCKETS/2] = {0}; // 65536 * 4 = 262144 Bytes = 0.25 MB
+u_int32_t buckets_of_B3[BUCKETS/4] = {0}; // 32768 * 4 = 131072 Bytes = 0.125 MB
+u_int32_t buckets_of_B4[BUCKETS/8] = {0}; // 16384 * 4 = 65536 Bytes = 0.0625 MB
+u_int32_t buckets_of_B5[BUCKETS/16] = {0}; // 8192 * 4 = 32768 Bytes = 0.03125 MB
+u_int32_t buckets_of_B6[BUCKETS/32] = {0}; // 4096 * 4 = 16384 Bytes = 0.015625 MB
+u_int32_t buckets_of_B7[BUCKETS/64] = {0}; // 2048 * 4 = 8192 Bytes = 0.0078125 MB
+u_int32_t buckets_of_B8[BUCKETS/128] = {0}; // 1024 * 4 = 4096 Bytes = 0.00390625 MB
+u_int32_t buckets_of_B9[BUCKETS/256] = {0}; // 512 * 4 = 2048 Bytes = 0.001953125 MB
+u_int32_t buckets_of_B10[BUCKETS/512] = {0}; // 256 * 4 = 1024 Bytes = 0.0009765625 MB
+u_int32_t buckets_of_B11[BUCKETS/1024] = {0}; // 128 * 4 = 512 Bytes = 0.00048828125 MB
+u_int32_t buckets_of_B12[BUCKETS/2048] = {0}; // 64 * 4 = 256 Bytes = 0.000244140625 MB
+u_int32_t buckets_of_B13[BUCKETS/4096] = {0}; // 32 * 4 = 128 Bytes = 0.0001220703125 MB
+u_int32_t buckets_of_B14[BUCKETS/8192] = {0}; // 16 * 4 = 64 Bytes = 0.00006103515625 MB
+u_int32_t buckets_of_B15[BUCKETS/16384] = {0}; // 8 * 4 = 32 Bytes = 0.000030517578125 MB
+u_int32_t buckets_of_B16[BUCKETS/32768] = {0}; // 4 * 4 = 16 Bytes = 0.0000152587890625 MB
+//Total Memory for buckets_of_B: ~1 MB
+
+void *buckets_of_B[16] = {buckets_of_B1, buckets_of_B2, buckets_of_B3, buckets_of_B4, buckets_of_B5, buckets_of_B6, buckets_of_B7, buckets_of_B8, buckets_of_B9, buckets_of_B10, buckets_of_B11, buckets_of_B12, buckets_of_B13, buckets_of_B14, buckets_of_B15, buckets_of_B16};
 
 u_int32_t init_size = 0;
 
@@ -53,8 +90,8 @@ void CEEngine::insertTuple(const std::vector<int>& tuple)
     }
     // histogram512[A/BIN_SIZE][B/BIN_SIZE]++;
 
-    buckets_of_A[A/BUCKET_SIZE]++;
-    buckets_of_B[B/BUCKET_SIZE]++;
+    buckets_of_A1[A/BUCKET_SIZE]++;
+    buckets_of_B1[B/BUCKET_SIZE]++;
 
     init_size++;
 }
@@ -77,8 +114,13 @@ void CEEngine::deleteTuple(const std::vector<int>& tuple, int tupleId)
     }
     // histogram512[A/BIN_SIZE][B/BIN_SIZE]--;
 
-    if (buckets_of_A[A/BUCKET_SIZE]) buckets_of_A[A/BUCKET_SIZE]--;
-    if (buckets_of_B[B/BUCKET_SIZE]) buckets_of_B[B/BUCKET_SIZE]--;
+    if (buckets_of_A1[A/BUCKET_SIZE]) buckets_of_A1[A/BUCKET_SIZE]--;
+    if (buckets_of_B1[B/BUCKET_SIZE]) buckets_of_B1[B/BUCKET_SIZE]--;
+
+    // for (int i = 0; i < 16; i++){
+    //     if (((u_int32_t(*)[BUCKETS])buckets_of_A)[A/BUCKET_SIZE]) ((u_int32_t(*)[BUCKETS])buckets_of_A)[A/BUCKET_SIZE]--;
+    //     if (((u_int32_t(*)[BUCKETS])buckets_of_B)[B/BUCKET_SIZE]) ((u_int32_t(*)[BUCKETS])buckets_of_B)[B/BUCKET_SIZE]--;
+    // }
 
     if (init_size) init_size--;
 }
@@ -93,7 +135,7 @@ int CEEngine::query(const std::vector<CompareExpression>& quals)
             u_int32_t value = quals[0].value;
 
             //Probabilistic
-            // return quals[0].columnIdx == 0 ? (buckets_of_A[value/BUCKET_SIZE]/BUCKET_SIZE)*SAMPLING_CORRECTION : (buckets_of_B[value/BUCKET_SIZE]/BUCKET_SIZE)*SAMPLING_CORRECTION;
+            // return quals[0].columnIdx == 0 ? (buckets_of_A1[value/BUCKET_SIZE]/BUCKET_SIZE)*SAMPLING_CORRECTION : (buckets_of_B1[value/BUCKET_SIZE]/BUCKET_SIZE)*SAMPLING_CORRECTION;
             return 1; // 1 is the best case scenario (20 mil tuples, 20 mil unique values)
             
         }
@@ -107,33 +149,25 @@ int CEEngine::query(const std::vector<CompareExpression>& quals)
             u_int32_t total_count = 0;
 
             // A > x
-            int start_i = A/BUCKET_SIZE+1;
-            int partial_cnt = 0;
-            u_int32_t i = start_i;
+            u_int32_t i = A/BUCKET_SIZE+1 < BUCKETS ? A/BUCKET_SIZE+1 : BUCKETS-1;
             if (quals[0].columnIdx == 0) {
-                for (i; (i < BUCKETS && i<(start_i+30)); i++) {
-                    partial_cnt += buckets_of_A[i];
+                for (i; i < BUCKETS; i++) {
+                    total_count += buckets_of_A1[i];
                 }
-
-                total_count += partial_cnt*( (double)(BUCKETS - start_i)/(i - start_i) );
                 // Experimental
                 // u_int32_t last_element = (A/BUCKET_SIZE+1)*(BUCKET_SIZE)-1;
-                // u_int32_t proportion = (last_element - A)/10 * buckets_of_A[A/BUCKET_SIZE];
+                // u_int32_t proportion = (last_element - A)/10 * buckets_of_A1[A/BUCKET_SIZE];
                 // total_count += proportion;
 
             // B > X
             } else {
-                int start_i = B/BUCKET_SIZE+1;
-                int partial_cnt = 0;
-                u_int32_t i = start_i;
-                for (i; (i < BUCKETS && i<(start_i+30)); i++) {
-                    partial_cnt += buckets_of_B[i];
+                u_int32_t i = B/BUCKET_SIZE+1 < BUCKETS ? B/BUCKET_SIZE+1 : BUCKETS-1;
+                for (i; i < BUCKETS; i++) {
+                    total_count += buckets_of_B1[i];
                 }
-                
-                total_count += partial_cnt*( (double)(BUCKETS - start_i)/(i - start_i) );
                 // Experimental
                 // u_int32_t last_element = (B/BUCKET_SIZE+1)*(BUCKET_SIZE)-1;
-                // u_int32_t proportion = (last_element - B)/10 * buckets_of_B[B/BUCKET_SIZE];
+                // u_int32_t proportion = (last_element - B)/10 * buckets_of_B1[B/BUCKET_SIZE];
                 // total_count += proportion;
             }
 
@@ -165,7 +199,7 @@ int CEEngine::query(const std::vector<CompareExpression>& quals)
             // u_int32_t B = quals[1].value;
             // u_int32_t total_count = 0;
 
-            // if (buckets_of_A[A/BUCKET_SIZE] == 0) return 0;
+            // if (buckets_of_A1[A/BUCKET_SIZE] == 0) return 0;
             // if (histogram[A/BIN_SIZE][B/BIN_SIZE] == 0) return 0;
 
             // for (u_int32_t i = B/BIN_SIZE+1; i < BINS; i++) {
@@ -189,7 +223,7 @@ int CEEngine::query(const std::vector<CompareExpression>& quals)
             // u_int32_t B = quals[1].value;
             // u_int32_t total_count = 0;
 
-            // if (buckets_of_B[B/BUCKET_SIZE] == 0) return 0;
+            // if (buckets_of_B1[B/BUCKET_SIZE] == 0) return 0;
             // if (histogram[A/BIN_SIZE][B/BIN_SIZE] == 0) return 0;
 
             // for (u_int32_t i = A/BIN_SIZE+1; i < BINS; i++) {
@@ -211,16 +245,16 @@ int CEEngine::query(const std::vector<CompareExpression>& quals)
             u_int32_t A = quals[0].value;
             u_int32_t B = quals[1].value;
 
-            //Test with hardcoded histogram32[][]
             u_int32_t total_count = 0;
+
+            // Stoned test for redundant buckets
             int index_a = A/(MAX_VALUE/32) < 32 ? A/(MAX_VALUE/32) : 31;
             int index_b = B/(MAX_VALUE/32) < 32 ? B/(MAX_VALUE/32) : 31;
-            // Stoned test for redundant buckets
-            total_count += ((u_int32_t(*)[32])histogram[4])[index_a][index_b] *((32 - index_a)+(32 - index_b))/2;
+            total_count += ((u_int32_t(*)[512])histogram[0])[index_a][index_b] *((32 - index_a)+(32 - index_b))/2;
 
-            for (u_int32_t i = A/(MAX_VALUE/32)+1; i < BINS/16; i++) {
-                for (u_int32_t j = B/(MAX_VALUE/32)+1; j < BINS/16; j++) {
-                    total_count += ((u_int32_t(*)[32])histogram[4])[i][j];
+            for (u_int32_t i = A/(MAX_VALUE/512)+1; i < BINS; i++) {
+                for (u_int32_t j = B/(MAX_VALUE/512)+1; j < BINS; j++) {
+                    total_count += ((u_int32_t(*)[512])histogram[0])[i][j];
                     // total_count += histogram512[i][j];
                 }
             }
@@ -250,7 +284,7 @@ CEEngine::CEEngine(int num, DataExecuter *dataExecuter)
     this->dataExecuter = dataExecuter;
 
     // Memory for data structures
-    // u_int32_t data_structures_memory = sizeof(histogram) + sizeof(buckets_of_A) + sizeof(buckets_of_B);
+    // u_int32_t data_structures_memory = sizeof(histogram) + sizeof(buckets_of_A1) + sizeof(buckets_of_B1);
 
     // Read all data from dataExecuter
     
@@ -267,6 +301,7 @@ CEEngine::CEEngine(int num, DataExecuter *dataExecuter)
 
             int size = 512;
             int index_a, index_b;
+
             for(int i = 0; i < 8; i++) {    
             index_a = A/(MAX_VALUE/size) < size ? A/(MAX_VALUE/size) : size-1;
             index_b = B/(MAX_VALUE/size) < size ? B/(MAX_VALUE/size) : size-1;
@@ -274,8 +309,10 @@ CEEngine::CEEngine(int num, DataExecuter *dataExecuter)
                 size /= 2;
             }
             // histogram512[A/BIN_SIZE][B/BIN_SIZE]++;
-            buckets_of_A[A/BUCKET_SIZE]++;
-            buckets_of_B[B/BUCKET_SIZE]++;
+            index_a = A/BUCKET_SIZE < BUCKETS ? A/BUCKET_SIZE : BUCKETS-1;
+            index_b = B/BUCKET_SIZE < BUCKETS ? B/BUCKET_SIZE : BUCKETS-1;
+            buckets_of_A1[index_a]++;
+            buckets_of_B1[index_b]++;
 
             // //Memory of data
             // u_int32_t vector_data = 0;
