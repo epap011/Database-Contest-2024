@@ -114,7 +114,7 @@ void CEEngine::deleteTuple(const std::vector<int>& tuple, int tupleId)
     u_int32_t B = tuple[1];
 
     int index_a, index_b, size;
-    size = 512;
+    size = BINS;
     for(int i = 0; i < 8; i++) {
         index_a = A/(MAX_VALUE/size) < size ? A/(MAX_VALUE/size) : size-1;
         index_b = B/(MAX_VALUE/size) < size ? B/(MAX_VALUE/size) : size-1;
@@ -122,10 +122,6 @@ void CEEngine::deleteTuple(const std::vector<int>& tuple, int tupleId)
             ((u_int32_t(*)[size])histogram[i])[index_a][index_b]--;
         size /= 2;
     }
-    // histogram512[A/BIN_SIZE][B/BIN_SIZE]--;
-
-    // if (buckets_of_A1[A/BUCKET_SIZE]) buckets_of_A1[A/BUCKET_SIZE]--;
-    // if (buckets_of_B1[B/BUCKET_SIZE]) buckets_of_B1[B/BUCKET_SIZE]--;
 
     size = BUCKETS;
     for (int i = 0; i < 16; i++){
@@ -149,7 +145,6 @@ int CEEngine::query(const std::vector<CompareExpression>& quals)
             u_int32_t value = quals[0].value;
 
             //Probabilistic
-            // return quals[0].columnIdx == 0 ? (buckets_of_A1[value/BUCKET_SIZE]/BUCKET_SIZE)*SAMPLING_CORRECTION : (buckets_of_B1[value/BUCKET_SIZE]/BUCKET_SIZE)*SAMPLING_CORRECTION;
             return 1; // 1 is the best case scenario (20 mil tuples, 20 mil unique values)
             
         }
@@ -180,11 +175,6 @@ int CEEngine::query(const std::vector<CompareExpression>& quals)
                 for(int i = index;i<4;i++)
                     total_count += ((u_int32_t*)buckets_of_A[15])[i];
 
-                // Experimental
-                // u_int32_t last_element = (A/BUCKET_SIZE+1)*(BUCKET_SIZE)-1;
-                // u_int32_t proportion = (last_element - A)/10 * buckets_of_A1[A/BUCKET_SIZE];
-                // total_count += proportion;
-
             // B > X
             } else {
                 // u_int32_t i = B/BUCKET_SIZE+1 < BUCKETS ? B/BUCKET_SIZE+1 : BUCKETS-1;
@@ -201,17 +191,9 @@ int CEEngine::query(const std::vector<CompareExpression>& quals)
                 }
                 for(int i = index;i<4;i++)
                     total_count += ((u_int32_t*)buckets_of_B[15])[i];
-
-                // Experimental
-                // u_int32_t last_element = (B/BUCKET_SIZE+1)*(BUCKET_SIZE)-1;
-                // u_int32_t proportion = (last_element - B)/10 * buckets_of_B1[B/BUCKET_SIZE];
-                // total_count += proportion;
             }
 
             return total_count*SAMPLING_CORRECTION;
-
-            // Probabilistic (pure speculation of uniform distribution, no sampling correction needed, no sampled data used)
-            // return ( (MAX_VALUE - quals[0].value) / MAX_VALUE )*init_size;
 
             // return init_size/2;
         }
@@ -221,60 +203,17 @@ int CEEngine::query(const std::vector<CompareExpression>& quals)
 
         // A = x AND B = y
         if (quals[0].compareOp == EQUAL && quals[1].compareOp == EQUAL) {
-            // u_int32_t A = quals[0].value;
-            // u_int32_t B = quals[1].value;
-
-            // if (histogram[A/BIN_SIZE][B/BIN_SIZE] == 0) return 0;
-
-            //Probabilistic (very slim chance of 1 on uniform distribution)
             return 0;
         }
 
         // A = x AND B > y
         if (quals[0].compareOp == EQUAL && quals[1].compareOp == GREATER) {
-            // u_int32_t A = quals[0].value;
-            // u_int32_t B = quals[1].value;
-            // u_int32_t total_count = 0;
-
-            // if (buckets_of_A1[A/BUCKET_SIZE] == 0) return 0;
-            // if (histogram[A/BIN_SIZE][B/BIN_SIZE] == 0) return 0;
-
-            // for (u_int32_t i = B/BIN_SIZE+1; i < BINS; i++) {
-            //     total_count += histogram[A/BIN_SIZE][i];
-            // }
-
-            // //total_count /= BIN_SIZE;
-
-            // return total_count*SAMPLING_CORRECTION;
-
-            //Probabilistic (pure speculation of uniform distribution, no sampling correction needed, no sampled data used)
-
-            //return ( ( (MAX_VALUE - quals[1].value) / MAX_VALUE )*init_size ) / MAX_VALUE;
-
             //Proven best approximation, so far
             return init_size/MAX_VALUE;
         }
 
         // A > x AND B = y
         if (quals[0].compareOp == GREATER && quals[1].compareOp == EQUAL) {
-            // u_int32_t A = quals[0].value;
-            // u_int32_t B = quals[1].value;
-            // u_int32_t total_count = 0;
-
-            // if (buckets_of_B1[B/BUCKET_SIZE] == 0) return 0;
-            // if (histogram[A/BIN_SIZE][B/BIN_SIZE] == 0) return 0;
-
-            // for (u_int32_t i = A/BIN_SIZE+1; i < BINS; i++) {
-            //     total_count += histogram[i][B/BIN_SIZE];
-            // }
-
-            // //total_count /= BIN_SIZE;
-
-            // return total_count*SAMPLING_CORRECTION;
-
-            //Probabilistic (pure speculation of uniform distribution, no sampling correction needed, no sampled data used)
-            //return ( ( (MAX_VALUE - quals[0].value) / MAX_VALUE )*init_size ) / MAX_VALUE;
-
             //Proven best approximation, so far
             return init_size/MAX_VALUE;
         }
@@ -287,21 +226,21 @@ int CEEngine::query(const std::vector<CompareExpression>& quals)
             u_int32_t total_count = 0;
             int index_a, index_b, size;
 
-            // Stoned test for redundant buckets
-            // int index_a = A/(MAX_VALUE/64) < 64 ? A/(MAX_VALUE/64) : 63;
-            // int index_b = B/(MAX_VALUE/64) < 64 ? B/(MAX_VALUE/64) : 63;
-            // total_count += ((u_int32_t(*)[64])histogram[3])[index_a][index_b] *((64 - index_a)+(64 - index_b))/2;
-
-            // index_a = A/BIN_SIZE+1 < BINS ? A/BIN_SIZE+1 : BINS-1;
-            // index_b = B/BIN_SIZE+1 < BINS ? B/BIN_SIZE+1 : BINS-1;
-            // for (u_int32_t i = index_a; i < BINS; i++) {
-            //     for (u_int32_t j = index_b; j < BINS; j++) {
-            //         total_count += ((u_int32_t(*)[BINS])histogram[0])[i][j];
-            //     }
-            // }
-
             //Logarithmic search in histograms
+            index_a = A/BIN_SIZE+1 < BINS ? A/BIN_SIZE+1 : BINS-1;
+            index_b = B/BIN_SIZE+1 < BINS ? B/BIN_SIZE+1 : BINS-1;
             size = 512;
+            
+            //Estimation for first row/column
+            for (int i=index_b; i<size; i++) {
+                total_count += ((u_int32_t(*)[size])histogram[0])[index_a][i] / 2;
+            }
+            for (int i=index_a; i<size; i++) {
+                total_count += ((u_int32_t(*)[size])histogram[0])[i][index_b] / 2;
+            }
+
+            total_count -= ((u_int32_t(*)[size])histogram[0])[index_a][index_b] / 2;
+
             index_a = A/BIN_SIZE+1 < size ? A/BIN_SIZE+1  : size-1;
             index_b = B/BIN_SIZE+1 < size ? B/BIN_SIZE+1  : size-1;
             bool flag_a, flag_b;
@@ -335,12 +274,6 @@ int CEEngine::query(const std::vector<CompareExpression>& quals)
             }
 
             return total_count*SAMPLING_CORRECTION;
-
-            // Probabilistic (pure speculation of uniform distribution, no sampling correction needed, no sampled data used)
-            // We calculate the area of the rectangle formed by the two points (A,B) and (MAX_VALUE,MAX_VALUE)
-            // double A_dimension = ( (MAX_VALUE - quals[0].value) / MAX_VALUE );
-            // double B_dimension = ( (MAX_VALUE - quals[1].value) / MAX_VALUE );
-            // return (A_dimension * B_dimension * init_size);
 
             // return init_size/2;
         }
