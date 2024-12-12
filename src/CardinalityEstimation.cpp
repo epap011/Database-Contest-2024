@@ -18,14 +18,14 @@
 //38986.354775828
 
 u_int32_t histogram512[BINS][BINS] = {0}; // 512 * 512 * 4 = 1,048,576 Bytes = 1 MB
-u_int32_t histogram256[BINS/2][BINS/2] = {0}; // 257 * 257 * 4 = 264,196 Bytes = 0.25 MB
-u_int32_t histogram128[BINS/4][BINS/4] = {0}; // 129 * 129 * 4 = 66,516 Bytes = 0.06 MB
-u_int32_t histogram64[BINS/8][BINS/8] = {0}; // 65 * 65 * 4 = 16,900 Bytes = 0.02 MB
-u_int32_t histogram32[BINS/16][BINS/16] = {0}; // 33 * 33 * 4 = 4,356 Bytes = 0.004 MB
-u_int32_t histogram16[BINS/32][BINS/32] = {0}; // 17 * 17 * 4 = 1,108 Bytes = 0.001 MB
-u_int32_t histogram8[BINS/64][BINS/64] = {0}; // 9 * 9 * 4 = 324 Bytes = 0.0003 MB
-u_int32_t histogram4[BINS/128][BINS/128] = {0}; // 5 * 5 * 4 = 100 Bytes = 0.0001 MB
-//Total Memory for histograms: 1.3381 MB
+u_int32_t histogram256[BINS/2][BINS/2] = {0}; // 256 * 256 * 4 = 262,144 Bytes = 0.25 MB
+u_int32_t histogram128[BINS/4][BINS/4] = {0}; // 128 * 128 * 4 = 131,072 Bytes = 0.125 MB
+u_int32_t histogram64[BINS/8][BINS/8] = {0}; // 64 * 64 * 4 = 65,536 Bytes = 0.0625 MB
+u_int32_t histogram32[BINS/16][BINS/16] = {0}; // 32 * 32 * 4 = 32,768 Bytes = 0.03125 MB
+u_int32_t histogram16[BINS/32][BINS/32] = {0}; // 16 * 16 * 4 = 16,384 Bytes = 0.015625 MB
+u_int32_t histogram8[BINS/64][BINS/64] = {0}; // 8 * 8 * 4 = 8,192 Bytes = 0.0078125 MB
+u_int32_t histogram4[BINS/128][BINS/128] = {0}; // 4 * 4 * 4 = 4,096 Bytes = 0.00390625 MB
+//Total Memory for histograms: ~1 MB
 
 void* histogram[8] = {histogram512, histogram256, histogram128, histogram64, histogram32, histogram16, histogram8, histogram4};
 
@@ -285,15 +285,52 @@ int CEEngine::query(const std::vector<CompareExpression>& quals)
             u_int32_t B = quals[1].value;
 
             u_int32_t total_count = 0;
+            int index_a, index_b, size;
 
             // Stoned test for redundant buckets
-            int index_a = A/(MAX_VALUE/64) < 64 ? A/(MAX_VALUE/64) : 63;
-            int index_b = B/(MAX_VALUE/64) < 64 ? B/(MAX_VALUE/64) : 63;
-            total_count += ((u_int32_t(*)[64])histogram[3])[index_a][index_b] *((64 - index_a)+(64 - index_b))/2;
+            // int index_a = A/(MAX_VALUE/64) < 64 ? A/(MAX_VALUE/64) : 63;
+            // int index_b = B/(MAX_VALUE/64) < 64 ? B/(MAX_VALUE/64) : 63;
+            // total_count += ((u_int32_t(*)[64])histogram[3])[index_a][index_b] *((64 - index_a)+(64 - index_b))/2;
 
-            for (u_int32_t i = A/(MAX_VALUE/64)+1; i < BINS/8; i++) {
-                for (u_int32_t j = B/(MAX_VALUE/64)+1; j < BINS/8; j++) {
-                    total_count += ((u_int32_t(*)[64])histogram[3])[i][j];
+            // index_a = A/BIN_SIZE+1 < BINS ? A/BIN_SIZE+1 : BINS-1;
+            // index_b = B/BIN_SIZE+1 < BINS ? B/BIN_SIZE+1 : BINS-1;
+            // for (u_int32_t i = index_a; i < BINS; i++) {
+            //     for (u_int32_t j = index_b; j < BINS; j++) {
+            //         total_count += ((u_int32_t(*)[BINS])histogram[0])[i][j];
+            //     }
+            // }
+
+            //Logarithmic search in histograms
+            size = 512;
+            index_a = A/BIN_SIZE+1 < size ? A/BIN_SIZE+1  : size-1;
+            index_b = B/BIN_SIZE+1 < size ? B/BIN_SIZE+1  : size-1;
+            bool flag_a, flag_b;
+            for(int i = 0; i < 7; i++) {
+                flag_a = flag_b = false;
+                if(index_a % 2){
+                    for(int j = index_b; j < size; j++) {
+                        total_count += ((u_int32_t(*)[size])histogram[i])[index_a][j];
+                    }
+                    index_a++;
+                    flag_a = true;
+                }
+                if(index_b % 2){
+                    for(int j = index_a; j < size; j++) {
+                        total_count += ((u_int32_t(*)[size])histogram[i])[j][index_b];
+                    }
+                    index_b++;
+                    flag_b = true;
+                }
+                if(flag_a && flag_b)
+                    total_count -= ((u_int32_t(*)[size])histogram[i])[index_a-1][index_b-1];
+
+                size /= 2;
+                index_a /= 2;
+                index_b /= 2;
+            }
+            for(int i = index_a; i < size; i++) {
+                for(int j = index_b; j < size; j++) {
+                    total_count += ((u_int32_t(*)[size])histogram[7])[i][j];
                 }
             }
 
