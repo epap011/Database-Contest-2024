@@ -4,6 +4,89 @@
 #include <common/Root.h>
 #include <CardinalityEstimation.h>
 
+#include <vector>
+#include <functional> // For std::hash
+#include <string>     // For combining keys
+#include <climits>    // For INT_MAX
+
+class CountMinSketch {          // Example emory per CMS = 10,000(WIDTH)×32(DEPTH)×4(BYTES)=1,280,000bytes (1.28 MB per CMS).
+private:
+    int width;                  // Number of columns in the sketch
+    int depth;                  // Number of hash functions (rows)
+    std::vector<std::vector<int>> table; // 2D table to store counts
+    std::vector<std::hash<std::string>> hashFunctions; // Hash functions
+
+public:
+    // Constructor
+    CountMinSketch(int width, int depth)
+        : width(width), depth(depth), table(depth, std::vector<int>(width, 0)) {
+        // Initialize hash functions (std::hash<string> acts as hash functions)
+        for (int i = 0; i < depth; ++i) {
+            hashFunctions.emplace_back(std::hash<std::string>());
+        }
+    }
+
+    // Insert an item into the sketch
+    void insert(int key) {
+        std::string keyStr = std::to_string(key);
+        for (int i = 0; i < depth; ++i) {
+            size_t hashVal = hashFunctions[i](keyStr);
+            table[i][hashVal % width] += 1;
+        }
+    }
+
+    // Query the approximate count of a key
+    int query(int key) const {
+        std::string keyStr = std::to_string(key);
+        int minCount = INT_MAX; // Start with a large value
+        for (int i = 0; i < depth; ++i) {
+            size_t hashVal = hashFunctions[i](keyStr);
+            minCount = std::min(minCount, table[i][hashVal % width]);
+        }
+        return minCount;
+    }
+};
+
+class BloomFilter {                         // Example memory per Bloom filter = (1024*1024)(FILTER)*8(ARRAY BITS) = 1 MB
+private:
+    size_t filter_size;                     // Size of the Bloom filter in bits
+    int num_hash_functions;                 // Number of hash functions
+    std::vector<bool> bit_array;            // Bit array for the filter
+
+    // Combine two integers into a single string key
+    std::string combineKeys(int a, int b) const {
+        return std::to_string(a) + ":" + std::to_string(b);
+    }
+
+public:
+    // Constructor
+    BloomFilter(size_t filter_size, int num_hash_functions)
+        : filter_size(filter_size),
+          num_hash_functions(num_hash_functions),
+          bit_array(filter_size, false) {}
+
+    // Insert a pair (A, B) into the Bloom filter
+    void insert(int a, int b) {
+        std::string combined = combineKeys(a, b);
+        for (int i = 0; i < num_hash_functions; ++i) {
+            size_t hash_val = std::hash<std::string>{}(combined + std::to_string(i));
+            bit_array[hash_val % filter_size] = true;
+        }
+    }
+
+    // Check if (A, B) is in the Bloom filter
+    bool query(int a, int b) const {
+        std::string combined = combineKeys(a, b);
+        for (int i = 0; i < num_hash_functions; ++i) {
+            size_t hash_val = std::hash<std::string>{}(combined + std::to_string(i));
+            if (!bit_array[hash_val % filter_size]) {
+                return false; // If any bit is unset, the pair is not in the filter
+            }
+        }
+        return true; // Pair might be in the filter
+    }
+};
+
 #define MEM_LIMIT_BYTES 4194304
 #define MAX_VALUE 20000000
 #define BUCKETS 131072
@@ -13,6 +96,10 @@
 #define OFFSET 500000
 #define SAMPLING_RATE 0.01
 #define SAMPLING_CORRECTION 100
+
+BloomFilter bloomFilter(1024 * 1024 * 8, 5);      // 1 MB Bloom filter with 5 hash functions
+CountMinSketch CMS_A(5000, 32);                   // 5000*32*4 = 640000 bytes = 0.64 MB
+CountMinSketch CMS_B(5000, 32);                   // 5000*32*4 = 640000 bytes = 0.64 MB
 
 //259740.25974026
 //38986.354775828
@@ -70,6 +157,8 @@ u_int32_t buckets_of_B16[BUCKETS/32768] = {0}; // 4 * 4 = 16 Bytes = 0.000015258
 void *buckets_of_B[16] = {buckets_of_B1, buckets_of_B2, buckets_of_B3, buckets_of_B4, buckets_of_B5, buckets_of_B6, buckets_of_B7, buckets_of_B8, buckets_of_B9, buckets_of_B10, buckets_of_B11, buckets_of_B12, buckets_of_B13, buckets_of_B14, buckets_of_B15, buckets_of_B16};
 
 u_int32_t init_size = 0;
+u_int32_t curr_size = 0;
+u_int32_t multiplier = SAMPLING_CORRECTION;
 
 // Total Memory for data structure: 1,003 + 0.99 + 0.99 = 2.97 MB
 
@@ -79,6 +168,10 @@ void CEEngine::insertTuple(const std::vector<int>& tuple)
 
     u_int32_t A = tuple[0];
     u_int32_t B = tuple[1];
+
+    bloomFilter.insert(A, B);
+    CMS_A.insert(A);
+    CMS_B.insert(B);
 
     int index_a, index_b, size;
     
@@ -103,7 +196,8 @@ void CEEngine::insertTuple(const std::vector<int>& tuple)
         size /= 2;
     }
 
-    init_size++;
+    curr_size++;
+    multiplier = SAMPLING_CORRECTION * (double)(curr_size)/init_size;
 }
 
 void CEEngine::deleteTuple(const std::vector<int>& tuple, int tupleId)
@@ -132,7 +226,11 @@ void CEEngine::deleteTuple(const std::vector<int>& tuple, int tupleId)
         size /= 2;
     }
     
-    if (init_size) init_size--;
+    if(curr_size){
+        curr_size--;
+        multiplier = SAMPLING_CORRECTION * (double)(curr_size)/init_size;
+    }
+        
 }
 
 int CEEngine::query(const std::vector<CompareExpression>& quals)
@@ -142,10 +240,15 @@ int CEEngine::query(const std::vector<CompareExpression>& quals)
     if (quals.size() == 1) {
         // A = x OR B = x | // Time Complexity: O(1)
         if (quals[0].compareOp == EQUAL) {
-            u_int32_t value = quals[0].value;
+            
+            if (quals[0].columnIdx == 0) {
+                return CMS_A.query(quals[0].value)*SAMPLING_CORRECTION;
+            } else {
+                return CMS_B.query(quals[0].value)*SAMPLING_CORRECTION;
+            }
 
             //Probabilistic
-            return 1; // 1 is the best case scenario (20 mil tuples, 20 mil unique values)
+            // return 1; // 1 is the best case scenario (20 mil tuples, 20 mil unique values)
             
         }
 
@@ -177,6 +280,7 @@ int CEEngine::query(const std::vector<CompareExpression>& quals)
 
             // B > X
             } else {
+
                 // u_int32_t i = B/BUCKET_SIZE+1 < BUCKETS ? B/BUCKET_SIZE+1 : BUCKETS-1;
                 // for (i; i < BUCKETS; i++) {
                 //     total_count += buckets_of_B1[i];
@@ -193,9 +297,10 @@ int CEEngine::query(const std::vector<CompareExpression>& quals)
                     total_count += ((u_int32_t*)buckets_of_B[15])[i];
             }
 
-            return total_count*SAMPLING_CORRECTION;
+            return total_count*multiplier;
 
-            // return init_size/2;
+            // Approximation, best so far
+            // return curr_size/2;
         }
     } 
     
@@ -203,32 +308,49 @@ int CEEngine::query(const std::vector<CompareExpression>& quals)
 
         // A = x AND B = y
         if (quals[0].compareOp == EQUAL && quals[1].compareOp == EQUAL) {
-            return 0;
+
+            if (quals[0].columnIdx == 0) {
+                return bloomFilter.query(quals[0].value, quals[1].value);
+            } else {
+                return bloomFilter.query(quals[1].value, quals[0].value);
+            }
+
+            //Proven best approximation, so far
+            // return 0;
         }
 
         // A = x AND B > y
         if (quals[0].compareOp == EQUAL && quals[1].compareOp == GREATER) {
             //Proven best approximation, so far
-            return init_size/MAX_VALUE;
+            return curr_size/MAX_VALUE;
         }
 
         // A > x AND B = y
         if (quals[0].compareOp == GREATER && quals[1].compareOp == EQUAL) {
             //Proven best approximation, so far
-            return init_size/MAX_VALUE;
+            return curr_size/MAX_VALUE;
         }
 
         // A > x AND B > y
         if (quals[0].compareOp == GREATER && quals[1].compareOp == GREATER) {
-            u_int32_t A = quals[0].value;
-            u_int32_t B = quals[1].value;
+
+            u_int32_t A;
+            u_int32_t B;
+
+            if(quals[0].columnIdx == 0) {
+                A = quals[0].value;
+                B = quals[1].value;
+            } else {
+                A = quals[1].value;
+                B = quals[0].value;
+            }
 
             u_int32_t total_count = 0;
             int index_a, index_b, size;
 
             //Logarithmic search in histograms
-            index_a = A/BIN_SIZE+1 < BINS ? A/BIN_SIZE+1 : BINS-1;
-            index_b = B/BIN_SIZE+1 < BINS ? B/BIN_SIZE+1 : BINS-1;
+            index_a = A/BIN_SIZE < BINS ? A/BIN_SIZE : BINS-1;
+            index_b = B/BIN_SIZE < BINS ? B/BIN_SIZE : BINS-1;
             size = 512;
             
             //Estimation for first row/column
@@ -273,9 +395,10 @@ int CEEngine::query(const std::vector<CompareExpression>& quals)
                 }
             }
 
-            return total_count*SAMPLING_CORRECTION;
+            return total_count*multiplier;
 
-            // return init_size/2;
+            // Approximation, best so far
+            // return curr_size/2;
         }
     }
 }
@@ -288,11 +411,8 @@ void CEEngine::prepare()
 CEEngine::CEEngine(int num, DataExecuter *dataExecuter)
 {
     init_size = num;
-    // Implement your constructor here.
+    curr_size = num;
     this->dataExecuter = dataExecuter;
-
-    // Memory for data structures
-    // u_int32_t data_structures_memory = sizeof(histogram) + sizeof(buckets_of_A1) + sizeof(buckets_of_B1);
 
     // Read all data from dataExecuter
     
@@ -306,6 +426,11 @@ CEEngine::CEEngine(int num, DataExecuter *dataExecuter)
 
             A = data[j][0];
             B = data[j][1];
+
+            bloomFilter.insert(A, B);
+            CMS_A.insert(A);
+            CMS_B.insert(B);
+
 
             int index_a, index_b, size;
 
@@ -325,21 +450,6 @@ CEEngine::CEEngine(int num, DataExecuter *dataExecuter)
                 ((u_int32_t*)buckets_of_B[i])[index_b]++;
                 size /= 2;
             }
-
-            // //Memory of data
-            // u_int32_t vector_data = 0;
-
-            // // Memory for the outer vector (std::vector<std::vector<int>>)
-            // vector_data = OFFSET * SAMPLING_RATE * sizeof(std::vector<int>); // Vector of vectors, storing pointers to inner vectors
-
-            // // Memory for each inner vector (std::vector<int>)
-            // for (u_int32_t k = 0; k < OFFSET*SAMPLING_RATE; k++) {
-            //     vector_data += 2 * sizeof(int);          // Memory for the elements in the vector
-            //     vector_data += sizeof(std::vector<int>); // Memory for the vector structure itself
-            // }
-
-            // // Total Memory
-            // std::cout << "Data-Structures Memory: " << data_structures_memory/1024.0/1024.0 << " MB" << " | Vector Memory: " << vector_data/1024.0/1024.0 << " MB" << " | Total Memory: " << (data_structures_memory + vector_data + 20)/1024.0/1024.0 << " MB" << std::endl;
         }
     }
     data.clear();

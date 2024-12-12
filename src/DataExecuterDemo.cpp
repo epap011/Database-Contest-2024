@@ -64,9 +64,10 @@ Action DataExecuterDemo::getNextAction()
         action.quals.push_back(expr);
     } else if (count % 100 == 98){
         action.actionType = QUERY;
-        CompareExpression expr1 = {rand() % 2, CompareOp(rand() % 2), rand() % MAX_VALUE + 1};
+        int columnIdx = rand() % 2;
+        CompareExpression expr1 = {columnIdx, CompareOp(rand() % 2), rand() % MAX_VALUE + 1};
         action.quals.push_back(expr1);
-        CompareExpression expr2 = {rand() % 2, CompareOp(rand() % 2), rand() % MAX_VALUE + 1};
+        CompareExpression expr2 = {columnIdx ? 0 : 1, CompareOp(rand() % 2), rand() % MAX_VALUE + 1};
         action.quals.push_back(expr2);
     } else if (count % 100 < 90) {
         action.actionType = INSERT;
