@@ -97,9 +97,9 @@ public:
 #define SAMPLING_RATE 0.01
 #define SAMPLING_CORRECTION 100
 
-BloomFilter bloomFilter(1024 * 1024 * 8, 5);      // 1 MB Bloom filter with 5 hash functions
-CountMinSketch CMS_A(5000, 32);                   // 5000*32*4 = 640000 bytes = 0.64 MB
-CountMinSketch CMS_B(5000, 32);                   // 5000*32*4 = 640000 bytes = 0.64 MB
+BloomFilter bloomFilter(256 * 1024 * 8, 5);      // .25 MB Bloom filter with 5 hash functions
+CountMinSketch CMS_A(2000, 32);                   // 2000 * 32 * 4 = 256000 Bytes = 0.25 MB
+CountMinSketch CMS_B(2000, 32);                   // 2000 * 32 * 4 = 256000 Bytes = 0.25 MB
 
 //259740.25974026
 //38986.354775828
@@ -242,9 +242,9 @@ int CEEngine::query(const std::vector<CompareExpression>& quals)
         if (quals[0].compareOp == EQUAL) {
             
             if (quals[0].columnIdx == 0) {
-                return CMS_A.query(quals[0].value)*SAMPLING_CORRECTION;
+                return CMS_A.query(quals[0].value)*multiplier;
             } else {
-                return CMS_B.query(quals[0].value)*SAMPLING_CORRECTION;
+                return CMS_B.query(quals[0].value)*multiplier;
             }
 
             //Probabilistic
@@ -321,14 +321,28 @@ int CEEngine::query(const std::vector<CompareExpression>& quals)
 
         // A = x AND B > y
         if (quals[0].compareOp == EQUAL && quals[1].compareOp == GREATER) {
+            int count;
+            if (quals[0].columnIdx == 0) {
+                count = CMS_A.query(quals[0].value)*multiplier;
+            } else {
+                count = CMS_B.query(quals[0].value)*multiplier;
+            }
+            return count*((double)(MAX_VALUE-quals[1].value)/MAX_VALUE);
             //Proven best approximation, so far
-            return curr_size/MAX_VALUE;
+            return 0;
         }
 
         // A > x AND B = y
         if (quals[0].compareOp == GREATER && quals[1].compareOp == EQUAL) {
+            int count;
+            if (quals[1].columnIdx == 0) {
+                count = CMS_A.query(quals[1].value)*multiplier;
+            } else {
+                count = CMS_B.query(quals[1].value)*multiplier;
+            }
+            return count*((double)(MAX_VALUE-quals[0].value)/MAX_VALUE);
             //Proven best approximation, so far
-            return curr_size/MAX_VALUE;
+            return 0;
         }
 
         // A > x AND B > y
