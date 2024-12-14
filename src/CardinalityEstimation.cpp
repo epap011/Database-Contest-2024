@@ -187,10 +187,6 @@ void CEEngine::insertTuple(const std::vector<int>& tuple)
         ((u_int32_t(*)[size])histogram[i])[index_a][index_b]++;
         size /= 2;
     }
-    histogram512[A/bin_size][B/bin_size]++;
-
-    // buckets_of_A1[A/bucket_size]++;
-    // buckets_of_B1[B/bucket_size]++;
 
     size = BUCKETS;
     for (int i = 0; i < 16; i++) {
@@ -235,7 +231,6 @@ void CEEngine::deleteTuple(const std::vector<int>& tuple, int tupleId)
         curr_size--;
         multiplier = SAMPLING_CORRECTION * (double)(init_size)/curr_size;
     }
-        
 }
 
 int CEEngine::query(const std::vector<CompareExpression>& quals)
@@ -361,15 +356,6 @@ int CEEngine::query(const std::vector<CompareExpression>& quals)
 
         // A > x AND B = y
         if (quals[0].compareOp == GREATER && quals[1].compareOp == EQUAL) {
-            // int count;
-            // if (quals[1].columnIdx == 0) {
-            //     count = CMS_A.query(quals[1].value)*multiplier;
-            // } else {
-            //     count = CMS_B.query(quals[1].value)*multiplier;
-            // }
-            // return count*((double)(MAX_VALUE-quals[0].value)/MAX_VALUE);
-            //Proven best approximation, so far
-            //return (curr_size/MAX_VALUE)*(MAX_VALUE-quals[0].value)/MAX_VALUE;
 
             //Case 1: (A > x AND A = y) or (B > x AND B = y)
             #ifdef DUPLICATE_COLUMNS
@@ -437,60 +423,60 @@ int CEEngine::query(const std::vector<CompareExpression>& quals)
             //Logarithmic search in histograms
             size = BINS;
             
-            // //Estimation for first row/column
-            // index_a = A/bin_size < BINS ? A/bin_size : BINS-1;
-            // index_b = B/bin_size < BINS ? B/bin_size : BINS-1;
-            // for (int i=index_b; i<size; i++) {
-            //     total_count += ((u_int32_t(*)[size])histogram[0])[index_a][i] / 2;
-            // }
-            // for (int i=index_a; i<size; i++) {
-            //     total_count += ((u_int32_t(*)[size])histogram[0])[i][index_b] / 2;
-            // }
+            //Estimation for first row/column
+            index_a = A/bin_size < BINS ? A/bin_size : BINS-1;
+            index_b = B/bin_size < BINS ? B/bin_size : BINS-1;
+            for (int i=index_b; i<size; i++) {
+                total_count += ((u_int32_t(*)[size])histogram[0])[index_a][i] / 2;
+            }
+            for (int i=index_a; i<size; i++) {
+                total_count += ((u_int32_t(*)[size])histogram[0])[i][index_b] / 2;
+            }
 
-            // total_count -= ((u_int32_t(*)[size])histogram[0])[index_a][index_b] / 2;
+            total_count -= ((u_int32_t(*)[size])histogram[0])[index_a][index_b] / 2;
 
-            // //Invalidate further calculations if the search is already at the last row/column
-            // if(index_a != BINS-1 && index_b != BINS-1) {
-            //     index_a = A/bin_size+1 < size ? A/bin_size+1  : size-1;
-            //     index_b = B/bin_size+1 < size ? B/bin_size+1  : size-1;
-            // }
-            // else{
-            //     index_a = size;
-            //     index_b = size;
-            // }
+            //Invalidate further calculations if the search is already at the last row/column
+            if(index_a != BINS-1 && index_b != BINS-1) {
+                index_a = A/bin_size+1 < size ? A/bin_size+1  : size-1;
+                index_b = B/bin_size+1 < size ? B/bin_size+1  : size-1;
+            }
+            else{
+                index_a = size;
+                index_b = size;
+            }
 
-            // index_a = A/bin_size+1 < size ? A/bin_size+1  : size-1;
-            // index_b = B/bin_size+1 < size ? B/bin_size+1  : size-1;
+            index_a = A/bin_size+1 < size ? A/bin_size+1  : size-1;
+            index_b = B/bin_size+1 < size ? B/bin_size+1  : size-1;
 
-            // bool flag_a, flag_b;
-            // for(int i = 0; i < 7; i++) {
-            //     flag_a = flag_b = false;
-            //     if(index_a % 2){
-            //         for(int j = index_b; j < size; j++) {
-            //             total_count += ((u_int32_t(*)[size])histogram[i])[index_a][j];
-            //         }
-            //         index_a++;
-            //         flag_a = true;
-            //     }
-            //     if(index_b % 2){
-            //         for(int j = index_a; j < size; j++) {
-            //             total_count += ((u_int32_t(*)[size])histogram[i])[j][index_b];
-            //         }
-            //         index_b++;
-            //         flag_b = true;
-            //     }
-            //     if(flag_a && flag_b)
-            //         total_count -= ((u_int32_t(*)[size])histogram[i])[index_a-1][index_b-1];
+            bool flag_a, flag_b;
+            for(int i = 0; i < 7; i++) {
+                flag_a = flag_b = false;
+                if(index_a % 2){
+                    for(int j = index_b; j < size; j++) {
+                        total_count += ((u_int32_t(*)[size])histogram[i])[index_a][j];
+                    }
+                    index_a++;
+                    flag_a = true;
+                }
+                if(index_b % 2){
+                    for(int j = index_a; j < size; j++) {
+                        total_count += ((u_int32_t(*)[size])histogram[i])[j][index_b];
+                    }
+                    index_b++;
+                    flag_b = true;
+                }
+                if(flag_a && flag_b)
+                    total_count -= ((u_int32_t(*)[size])histogram[i])[index_a-1][index_b-1];
 
-            //     size /= 2;
-            //     index_a /= 2;
-            //     index_b /= 2;
-            // }
-            // for(int i = index_a; i < size; i++) {
-            //     for(int j = index_b; j < size; j++) {
-            //         total_count += ((u_int32_t(*)[size])histogram[7])[i][j];
-            //     }
-            // }
+                size /= 2;
+                index_a /= 2;
+                index_b /= 2;
+            }
+            for(int i = index_a; i < size; i++) {
+                for(int j = index_b; j < size; j++) {
+                    total_count += ((u_int32_t(*)[size])histogram[7])[i][j];
+                }
+            }
 
             return total_count*multiplier;
 
