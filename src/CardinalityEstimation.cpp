@@ -93,9 +93,9 @@
 #define BUCKET_SIZE 152
 #define BINS 512
 #define BIN_SIZE 39062
-#define OFFSET 250000
-#define SAMPLING_RATE 0.02
-#define SAMPLING_CORRECTION 50
+#define OFFSET 125000
+#define SAMPLING_RATE 0.04
+#define SAMPLING_CORRECTION 25
 
 #define DUPLICATE_COLUMNS //Uncomment to enable duplicate columns (A [>,=] x AND A [>,=] y) or (B [>,=] x AND B [>,=] y)
 
