@@ -14,7 +14,6 @@ int main(int argc, char *argv[])
     auto duration = std::chrono::duration_cast<std::chrono::milliseconds>(stop - start);
     std::cout << "Time taken by DataExecuterDemo: "
          << duration.count() << " milliseconds" << std::endl;
-
     auto start1 = std::chrono::high_resolution_clock::now();
     CEEngine ceEngine(initSize, &dataExecuter);
     auto stop1 = std::chrono::high_resolution_clock::now();

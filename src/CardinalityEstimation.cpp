@@ -93,9 +93,9 @@
 #define BUCKET_SIZE 152
 #define BINS 512
 #define BIN_SIZE 39062
-#define OFFSET 500000
-#define SAMPLING_RATE 0.01
-#define SAMPLING_CORRECTION 100
+#define OFFSET 250000
+#define SAMPLING_RATE 0.02
+#define SAMPLING_CORRECTION 50
 
 // BloomFilter bloomFilter(768 * 1024 * 8, 5);      // .25 MB Bloom filter with 5 hash functions
 // CountMinSketch CMS_A(2000, 32);                   // 2000 * 32 * 4 = 256000 Bytes = 0.25 MB
@@ -159,7 +159,7 @@ void *buckets_of_B[16] = {buckets_of_B1, buckets_of_B2, buckets_of_B3, buckets_o
 u_int32_t init_size = 0;
 u_int32_t curr_size = 0;
 u_int32_t multiplier = SAMPLING_CORRECTION;
-int max_value = 0;
+int max_value = MAX_VALUE;
 int bin_size = BIN_SIZE;
 int bucket_size = BUCKET_SIZE;
 
@@ -329,7 +329,14 @@ int CEEngine::query(const std::vector<CompareExpression>& quals)
             // return count*((double)(MAX_VALUE-quals[1].value)/MAX_VALUE);
             //Proven best approximation, so far
             //return (curr_size/MAX_VALUE)*(MAX_VALUE-quals[1].value)/MAX_VALUE;
-            return curr_size/MAX_VALUE;
+            if (quals[0].columnIdx == quals[1].columnIdx) {
+                int x = quals[0].value;
+                int y = quals[1].value;
+                if (y >= x)
+                    return 0;
+                return quals[0].columnIdx == 0 ? (buckets_of_A1[quals[0].value/bucket_size]/bucket_size)*SAMPLING_CORRECTION : (buckets_of_B1[quals[0].value/bucket_size]/bucket_size)*SAMPLING_CORRECTION;
+            }
+            return curr_size/max_value;
         }
 
         // A > x AND B = y
@@ -343,7 +350,14 @@ int CEEngine::query(const std::vector<CompareExpression>& quals)
             // return count*((double)(MAX_VALUE-quals[0].value)/MAX_VALUE);
             //Proven best approximation, so far
             //return (curr_size/MAX_VALUE)*(MAX_VALUE-quals[0].value)/MAX_VALUE;
-            return curr_size/MAX_VALUE;
+            if (quals[0].columnIdx == quals[1].columnIdx) {
+                int x = quals[0].value;
+                int y = quals[1].value;
+                if (y <= x)
+                    return 0;
+                return quals[1].columnIdx == 0 ? (buckets_of_A1[quals[1].value/bucket_size]/bucket_size)*SAMPLING_CORRECTION : (buckets_of_B1[quals[1].value/bucket_size]/bucket_size)*SAMPLING_CORRECTION;
+            }
+            return curr_size/max_value;
         }
 
         // A > x AND B > y
@@ -361,6 +375,39 @@ int CEEngine::query(const std::vector<CompareExpression>& quals)
 
             u_int32_t total_count = 0;
             int index_a, index_b, size;
+
+            //Case 1: A > x AND A > y
+
+            if(quals[0].columnIdx == quals[1].columnIdx) {
+
+                int value = quals[0].value < quals[1].value ? quals[0].value : quals[1].value;
+                size = BUCKETS;
+                int index;
+
+                if(quals[0].columnIdx == 0){
+                    index = A/bucket_size+1 < size ? A/bucket_size+1 : size-1;
+                    for(int i=0; i < 15; i++) {
+                        if(index % 2 == 1)
+                        total_count += ((u_int32_t*)buckets_of_A[i])[index++];
+                        index /= 2;
+                    }
+                    for(int i = index;i<4;i++)
+                        total_count += ((u_int32_t*)buckets_of_A[15])[i];
+                }
+                else{
+                    index = B/bucket_size+1 < size ? B/bucket_size+1 : size-1;
+                    for(int i=0; i < 15; i++) {
+                        if(index % 2 == 1)
+                        total_count += ((u_int32_t*)buckets_of_A[i])[index++];
+                        index /= 2;
+                    }
+                    for(int i = index;i<4;i++)
+                        total_count += ((u_int32_t*)buckets_of_A[15])[i];
+                }
+                return total_count*multiplier;
+            }
+
+            //Case 2: A > x AND B > y
 
             //Logarithmic search in histograms
             size = BINS;
@@ -446,18 +493,19 @@ CEEngine::CEEngine(int num, DataExecuter *dataExecuter)
 
     // Sample table for max value, to assign appropriate bin and bucket sizes
 
-    for (int k = 0; k < 4; k++) {
-        data.clear();
-        dataExecuter->readTuples(k*(num/4), 5000, data);
-        for (int i = 0; i < 5000; i++) {
-            A = data[i][0];
-            B = data[i][1];
-            if(A > max_value) max_value = A;
-            if(B > max_value) max_value = B;
-        }
-    }
-    data.clear();
-    
+    // max_value = 0;
+    // for (int k = 0; k < 4; k++) {
+    //     data.clear();
+    //     dataExecuter->readTuples(k*(num/4), 5000, data);
+    //     for (int i = 0; i < 5000; i++) {
+    //         A = data[i][0];
+    //         B = data[i][1];
+    //         if(A > max_value) max_value = A;
+    //         if(B > max_value) max_value = B;
+    //     }
+    // }
+    // data.clear();
+
     // Round up max value to the nearest 100,000 (seems not necessary)
     //max_value = ((max_value + 99999) / 100000) * 100000;
     //std::cout << "Max Value: " << max_value << std::endl;
