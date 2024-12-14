@@ -253,7 +253,8 @@ int CEEngine::query(const std::vector<CompareExpression>& quals)
             // }
 
             //Probabilistic (proven best on tests)
-            return quals[0].columnIdx == 0 ? (buckets_of_A1[quals[0].value/bucket_size]/bucket_size)*SAMPLING_CORRECTION : (buckets_of_B1[quals[0].value/bucket_size]/bucket_size)*SAMPLING_CORRECTION;
+            int estimation = quals[0].columnIdx == 0 ? (buckets_of_A1[quals[0].value/bucket_size]/bucket_size)*SAMPLING_CORRECTION : (buckets_of_B1[quals[0].value/bucket_size]/bucket_size)*SAMPLING_CORRECTION;
+            return estimation;
             
             //return 0;
         }
@@ -381,7 +382,7 @@ int CEEngine::query(const std::vector<CompareExpression>& quals)
                 return quals[1].columnIdx == 0 ? (buckets_of_A1[quals[1].value/bucket_size]/bucket_size)*SAMPLING_CORRECTION : (buckets_of_B1[quals[1].value/bucket_size]/bucket_size)*SAMPLING_CORRECTION;
             }
             #endif
-            
+
             //Case 2: (A > x AND B = y)
             return curr_size/max_value;
         }
@@ -406,12 +407,11 @@ int CEEngine::query(const std::vector<CompareExpression>& quals)
             #ifdef DUPLICATE_COLUMNS
             if(quals[0].columnIdx == quals[1].columnIdx) {
 
-                int value = quals[0].value < quals[1].value ? quals[0].value : quals[1].value;
                 size = BUCKETS;
-                int index;
+                int value = quals[0].value < quals[1].value ? quals[0].value : quals[1].value;
+                int index = value/bucket_size+1 < size ? value/bucket_size+1 : size-1;
 
                 if(quals[0].columnIdx == 0){
-                    index = A/bucket_size+1 < size ? A/bucket_size+1 : size-1;
                     for(int i=0; i < 15; i++) {
                         if(index % 2 == 1)
                             total_count += ((u_int32_t*)buckets_of_A[i])[index++];
@@ -421,14 +421,13 @@ int CEEngine::query(const std::vector<CompareExpression>& quals)
                         total_count += ((u_int32_t*)buckets_of_A[15])[i];
                 }
                 else{
-                    index = B/bucket_size+1 < size ? B/bucket_size+1 : size-1;
                     for(int i=0; i < 15; i++) {
                         if(index % 2 == 1)
-                            total_count += ((u_int32_t*)buckets_of_A[i])[index++];
+                            total_count += ((u_int32_t*)buckets_of_B[i])[index++];
                         index /= 2;
                     }
                     for(int i = index;i<4;i++)
-                        total_count += ((u_int32_t*)buckets_of_A[15])[i];
+                        total_count += ((u_int32_t*)buckets_of_B[15])[i];
                 }
                 return total_count*multiplier;
             }
