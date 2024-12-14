@@ -97,6 +97,8 @@
 #define SAMPLING_RATE 0.02
 #define SAMPLING_CORRECTION 50
 
+#define DUPLICATE_COLUMNS //Uncomment to enable duplicate columns (A [>,=] x AND A [>,=] y) or (B [>,=] x AND B [>,=] y)
+
 // BloomFilter bloomFilter(768 * 1024 * 8, 5);      // .25 MB Bloom filter with 5 hash functions
 // CountMinSketch CMS_A(2000, 32);                   // 2000 * 32 * 4 = 256000 Bytes = 0.25 MB
 // CountMinSketch CMS_B(2000, 32);                   // 2000 * 32 * 4 = 256000 Bytes = 0.25 MB
@@ -314,6 +316,18 @@ int CEEngine::query(const std::vector<CompareExpression>& quals)
             //     return bloomFilter.query(quals[1].value, quals[0].value);
             // }
 
+            //Case 1: (A = x AND A = y) or (B = x AND B = y)
+            #ifdef DUPLICATE_COLUMNS
+            if(quals[0].columnIdx == quals[1].columnIdx) {
+                int x = quals[0].value;
+                int y = quals[1].value;
+                if(x == y)
+                    return quals[0].columnIdx == 0 ? (buckets_of_A1[x/bucket_size]/bucket_size)*SAMPLING_CORRECTION : (buckets_of_B1[y/bucket_size]/bucket_size)*SAMPLING_CORRECTION;
+                return 0;
+            }
+            #endif
+
+            //Case 2: (A = x AND B = y)
             //Proven best approximation, so far
             return 0;
         }
@@ -329,6 +343,9 @@ int CEEngine::query(const std::vector<CompareExpression>& quals)
             // return count*((double)(MAX_VALUE-quals[1].value)/MAX_VALUE);
             //Proven best approximation, so far
             //return (curr_size/MAX_VALUE)*(MAX_VALUE-quals[1].value)/MAX_VALUE;
+
+            //Case 1: (A = x AND A > y) or (B = x AND B > y)
+            #ifdef DUPLICATE_COLUMNS
             if (quals[0].columnIdx == quals[1].columnIdx) {
                 int x = quals[0].value;
                 int y = quals[1].value;
@@ -336,6 +353,9 @@ int CEEngine::query(const std::vector<CompareExpression>& quals)
                     return 0;
                 return quals[0].columnIdx == 0 ? (buckets_of_A1[quals[0].value/bucket_size]/bucket_size)*SAMPLING_CORRECTION : (buckets_of_B1[quals[0].value/bucket_size]/bucket_size)*SAMPLING_CORRECTION;
             }
+            #endif
+
+            //Case 2: (A = x AND B > y)
             return curr_size/max_value;
         }
 
@@ -350,6 +370,9 @@ int CEEngine::query(const std::vector<CompareExpression>& quals)
             // return count*((double)(MAX_VALUE-quals[0].value)/MAX_VALUE);
             //Proven best approximation, so far
             //return (curr_size/MAX_VALUE)*(MAX_VALUE-quals[0].value)/MAX_VALUE;
+
+            //Case 1: (A > x AND A = y) or (B > x AND B = y)
+            #ifdef DUPLICATE_COLUMNS
             if (quals[0].columnIdx == quals[1].columnIdx) {
                 int x = quals[0].value;
                 int y = quals[1].value;
@@ -357,6 +380,9 @@ int CEEngine::query(const std::vector<CompareExpression>& quals)
                     return 0;
                 return quals[1].columnIdx == 0 ? (buckets_of_A1[quals[1].value/bucket_size]/bucket_size)*SAMPLING_CORRECTION : (buckets_of_B1[quals[1].value/bucket_size]/bucket_size)*SAMPLING_CORRECTION;
             }
+            #endif
+            
+            //Case 2: (A > x AND B = y)
             return curr_size/max_value;
         }
 
@@ -376,8 +402,8 @@ int CEEngine::query(const std::vector<CompareExpression>& quals)
             u_int32_t total_count = 0;
             int index_a, index_b, size;
 
-            //Case 1: A > x AND A > y
-
+            //Case 1: (A > x AND A > y) or (B > x AND B > y)
+            #ifdef DUPLICATE_COLUMNS
             if(quals[0].columnIdx == quals[1].columnIdx) {
 
                 int value = quals[0].value < quals[1].value ? quals[0].value : quals[1].value;
@@ -388,7 +414,7 @@ int CEEngine::query(const std::vector<CompareExpression>& quals)
                     index = A/bucket_size+1 < size ? A/bucket_size+1 : size-1;
                     for(int i=0; i < 15; i++) {
                         if(index % 2 == 1)
-                        total_count += ((u_int32_t*)buckets_of_A[i])[index++];
+                            total_count += ((u_int32_t*)buckets_of_A[i])[index++];
                         index /= 2;
                     }
                     for(int i = index;i<4;i++)
@@ -398,7 +424,7 @@ int CEEngine::query(const std::vector<CompareExpression>& quals)
                     index = B/bucket_size+1 < size ? B/bucket_size+1 : size-1;
                     for(int i=0; i < 15; i++) {
                         if(index % 2 == 1)
-                        total_count += ((u_int32_t*)buckets_of_A[i])[index++];
+                            total_count += ((u_int32_t*)buckets_of_A[i])[index++];
                         index /= 2;
                     }
                     for(int i = index;i<4;i++)
@@ -406,8 +432,9 @@ int CEEngine::query(const std::vector<CompareExpression>& quals)
                 }
                 return total_count*multiplier;
             }
+            #endif
 
-            //Case 2: A > x AND B > y
+            //Case 2: (A > x AND B > y)
 
             //Logarithmic search in histograms
             size = BINS;
