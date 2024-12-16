@@ -4,7 +4,7 @@
 int main(int argc, char *argv[])
 {
     int initSize = 1000000; // Initial data size.
-    int opSize = 10000; // Number of operations.
+    int opSize = 20000;    // Number of operations.
     double score = 0;
     int cnt = 0;
     
