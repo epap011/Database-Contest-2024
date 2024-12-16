@@ -37,7 +37,7 @@ int main(int argc, char *argv[])
     queryAction.actionType = QUERY;
     int columnIdx, compareOp, value;
     CompareExpression expr;
-    int score_over = 0;
+    // int score_over = 0;
     while(queriesFile.peek() != EOF) {
         queryAction.quals.clear();
         queriesFile.read((char*)&columnIdx, sizeof(int));
@@ -56,8 +56,9 @@ int main(int argc, char *argv[])
         resultsFile.read((char*)&real, sizeof(int));
         // if (queryAction.quals[0].compareOp == 0 || queryAction.quals[1].compareOp == 0) continue;
         ans = ceEngine.query(queryAction.quals);
-        if(fabs(std::log((ans + 1) * 1.0 / (real + 1))) > 2)
-            {std::cout <<"Score: "<< fabs(std::log((ans + 1) * 1.0 / (real + 1))) << " real: " << real << " ans: " << ans << std::endl; score_over++;}
+        // print queries from a score and above
+        // if(fabs(std::log((ans + 1) * 1.0 / (real + 1))) > 2)
+        //     {std::cout <<"Score: "<< fabs(std::log((ans + 1) * 1.0 / (real + 1))) << " real: " << real << " ans: " << ans << std::endl; score_over++;}
         score += fabs(std::log((ans + 1) * 1.0 / (real + 1)));
         cnt++;
     }
@@ -71,7 +72,7 @@ int main(int argc, char *argv[])
     std::cout << "Time taken by CEengine Estimator: "
           << duration2.count() << " milliseconds" << std::endl;
     std::cout << "Score: " << score / cnt << std::endl;
-    std::cout << "Score over 2: " << score_over << std::endl;
+    // std::cout << "Score over 2: " << score_over << std::endl;
 
     // Action action = dataExecuter.getNextAction();
 

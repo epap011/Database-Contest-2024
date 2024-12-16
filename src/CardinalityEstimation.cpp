@@ -90,14 +90,14 @@
 #define MEM_LIMIT_BYTES 4194304
 #define MAX_VALUE 20000000
 #define BUCKETS 131072
-#define BUCKET_SIZE 152
+#define BUCKET_SIZE (MAX_VALUE/BUCKETS)
 #define BINS 512
-#define BIN_SIZE 39062
-#define OFFSET 125000
-#define SAMPLING_RATE 0.04
-#define SAMPLING_CORRECTION 25
+#define BIN_SIZE (MAX_VALUE/BINS)
+#define OFFSET 250000
+#define SAMPLING_RATE 0.02
+#define SAMPLING_CORRECTION (1/SAMPLING_RATE)
 
-#define DUPLICATE_COLUMNS //Uncomment to enable duplicate columns (A [>,=] x AND A [>,=] y) or (B [>,=] x AND B [>,=] y)
+//#define DUPLICATE_COLUMNS //Uncomment to enable duplicate columns (A [>,=] x AND A [>,=] y) or (B [>,=] x AND B [>,=] y)
 
 // BloomFilter bloomFilter(768 * 1024 * 8, 5);      // .25 MB Bloom filter with 5 hash functions
 // CountMinSketch CMS_A(2000, 32);                   // 2000 * 32 * 4 = 256000 Bytes = 0.25 MB
@@ -160,7 +160,7 @@ void *buckets_of_B[16] = {buckets_of_B1, buckets_of_B2, buckets_of_B3, buckets_o
 
 u_int32_t init_size = 0;
 u_int32_t curr_size = 0;
-u_int32_t multiplier = SAMPLING_CORRECTION;
+double multiplier = SAMPLING_CORRECTION;
 int max_value = MAX_VALUE;
 int bin_size = BIN_SIZE;
 int bucket_size = BUCKET_SIZE;
@@ -187,10 +187,6 @@ void CEEngine::insertTuple(const std::vector<int>& tuple)
         ((u_int32_t(*)[size])histogram[i])[index_a][index_b]++;
         size /= 2;
     }
-    // histogram512[A/bin_size][B/bin_size]++;
-
-    // buckets_of_A1[A/bucket_size]++;
-    // buckets_of_B1[B/bucket_size]++;
 
     size = BUCKETS;
     for (int i = 0; i < 16; i++) {
@@ -202,7 +198,7 @@ void CEEngine::insertTuple(const std::vector<int>& tuple)
     }
 
     curr_size++;
-    multiplier = SAMPLING_CORRECTION * (double)(init_size)/curr_size;
+    multiplier = (double) curr_size / (init_size*SAMPLING_RATE + (curr_size - init_size));
 }
 
 void CEEngine::deleteTuple(const std::vector<int>& tuple, int tupleId)
@@ -233,9 +229,8 @@ void CEEngine::deleteTuple(const std::vector<int>& tuple, int tupleId)
     
     if(curr_size){
         curr_size--;
-        multiplier = SAMPLING_CORRECTION * (double)(init_size)/curr_size;
+        multiplier = (double) curr_size / (init_size*SAMPLING_RATE + (curr_size - init_size));
     }
-        
 }
 
 int CEEngine::query(const std::vector<CompareExpression>& quals)
@@ -253,7 +248,7 @@ int CEEngine::query(const std::vector<CompareExpression>& quals)
             // }
 
             //Probabilistic (proven best on tests)
-            int estimation = quals[0].columnIdx == 0 ? (buckets_of_A1[quals[0].value/bucket_size]/bucket_size)*SAMPLING_CORRECTION : (buckets_of_B1[quals[0].value/bucket_size]/bucket_size)*SAMPLING_CORRECTION;
+            int estimation = quals[0].columnIdx == 0 ? ((double)(buckets_of_A1[quals[0].value/bucket_size])/bucket_size)*multiplier : ((double)(buckets_of_B1[quals[0].value/bucket_size])/bucket_size)*multiplier;
             return estimation;
             
             //return 0;
@@ -310,7 +305,6 @@ int CEEngine::query(const std::vector<CompareExpression>& quals)
 
         // A = x AND B = y
         if (quals[0].compareOp == EQUAL && quals[1].compareOp == EQUAL) {
-
             // if (quals[0].columnIdx == 0) {
             //     return bloomFilter.query(quals[0].value, quals[1].value);
             // } else {
@@ -362,15 +356,6 @@ int CEEngine::query(const std::vector<CompareExpression>& quals)
 
         // A > x AND B = y
         if (quals[0].compareOp == GREATER && quals[1].compareOp == EQUAL) {
-            // int count;
-            // if (quals[1].columnIdx == 0) {
-            //     count = CMS_A.query(quals[1].value)*multiplier;
-            // } else {
-            //     count = CMS_B.query(quals[1].value)*multiplier;
-            // }
-            // return count*((double)(MAX_VALUE-quals[0].value)/MAX_VALUE);
-            //Proven best approximation, so far
-            //return (curr_size/MAX_VALUE)*(MAX_VALUE-quals[0].value)/MAX_VALUE;
 
             //Case 1: (A > x AND A = y) or (B > x AND B = y)
             #ifdef DUPLICATE_COLUMNS
@@ -438,7 +423,7 @@ int CEEngine::query(const std::vector<CompareExpression>& quals)
             //Logarithmic search in histograms
             size = BINS;
             
-            // //Estimation for first row/column
+            //Estimation for first row/column
             // index_a = A/bin_size < BINS ? A/bin_size : BINS-1;
             // index_b = B/bin_size < BINS ? B/bin_size : BINS-1;
             // for (int i=index_b; i<size; i++) {
@@ -571,6 +556,6 @@ CEEngine::CEEngine(int num, DataExecuter *dataExecuter)
                 size /= 2;
             }
         }
-    }
+    }    
     data.clear();
 }

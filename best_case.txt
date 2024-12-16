@@ -1,0 +1,37 @@
+﻿~Best case so far: 21.234441 ~
+
+Single/Multi ratio in tests = 1:1
+
+
+
+						(parameters)
+
+
+Score			-			21.234441
+
+Sampling			-			1%
+
+Offset			-			500,000
+
+
+			(%of total queries)		(handling of each)
+
+~Single-column
+
+{A,B}=x			25%			return buckets_of{A,B}[{A,B}/bucket_size]/bucket_size*multiplier;
+
+{A,B}>x			25%			return curr_size/2;
+
+~Multi-column
+
+A=x AND B=x		12.5%			return 0;
+
+A=x AND B>x		12.5%  \
+				25%		return curr_size/max_value;
+A>x AND B=x		12.5%  /
+
+A>x AND B>x		12.5%			return curr_size/2;
+
+multiplier = SAMPLING_CORRECTION * (double)(init_size)/curr_size;
+
+multiplier = (double) curr_size / (init_size*SAMPLING_RATE + (curr_size - init_size));
