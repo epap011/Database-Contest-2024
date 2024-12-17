@@ -72,7 +72,7 @@ int main(int argc, char *argv[])
     std::cout << message << score / cnt << std::endl << std::endl <<"Score analysis"<< std::endl << std::endl;
     std::cout << "(25%)   {A,B} = X: " << SingleEqualScore / SingleEqualCnt << std::endl;
     std::cout << "(25%)   {A,B} > X: " << SingleGreaterScore / SingleGreaterCnt << std::endl;
-    std::cout << "(12.5%) {A} = X, {B} = Y: " << DoubleEqualScore / DoubleEqualCnt << std::endl;
+    std::cout << "(12.5%) {A,B} = X, {B,A} = Y: " << DoubleEqualScore / DoubleEqualCnt << std::endl;
     std::cout << "(12.5%) {A,B} > X, {B,A} > Y: " << DoubleGreaterScore / DoubleGreaterCnt << std::endl;
     std::cout << "(%25)   {A,B} > X, {B,A} = Y: " << DoubleGreaterEqualScore / DoubleGreaterEqualCnt << std::endl;
     auto stop2 = std::chrono::high_resolution_clock::now();
