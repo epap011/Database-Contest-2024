@@ -9,7 +9,7 @@
 // #include <string>     // For combining keys
 // #include <climits>    // For INT_MAX
 
-// class CountMinSketch {          // Example memory per CMS = 10,000(WIDTH)×32(DEPTH)×4(BYTES)=1,280,000bytes (1.28 MB per CMS).
+// class CountMinSketch {          // Example memory per CMS = 10,000(WIDTH)Ã—32(DEPTH)Ã—4(BYTES)=1,280,000bytes (1.28 MB per CMS).
 // private:
 //     int width;                  // Number of columns in the sketch
 //     int depth;                  // Number of hash functions (rows)
@@ -90,14 +90,14 @@
 #define MEM_LIMIT_BYTES 4194304
 #define MAX_VALUE 20000000
 #define BUCKETS 131072
-#define BUCKET_SIZE 152
+#define BUCKET_SIZE (MAX_VALUE/BUCKETS)
 #define BINS 512
-#define BIN_SIZE 39062
-#define OFFSET 125000
-#define SAMPLING_RATE 0.04
-#define SAMPLING_CORRECTION 25
+#define BIN_SIZE (MAX_VALUE/BINS)
+#define OFFSET 250000
+#define SAMPLING_RATE 0.02
+#define SAMPLING_CORRECTION (1/SAMPLING_RATE)
 
-#define DUPLICATE_COLUMNS //Uncomment to enable duplicate columns (A [>,=] x AND A [>,=] y) or (B [>,=] x AND B [>,=] y)
+//#define DUPLICATE_COLUMNS //Uncomment to enable duplicate columns (A [>,=] x AND A [>,=] y) or (B [>,=] x AND B [>,=] y)
 
 // BloomFilter bloomFilter(768 * 1024 * 8, 5);      // .25 MB Bloom filter with 5 hash functions
 // CountMinSketch CMS_A(2000, 32);                   // 2000 * 32 * 4 = 256000 Bytes = 0.25 MB
@@ -160,7 +160,7 @@ void *buckets_of_B[16] = {buckets_of_B1, buckets_of_B2, buckets_of_B3, buckets_o
 
 u_int32_t init_size = 0;
 u_int32_t curr_size = 0;
-u_int32_t multiplier = SAMPLING_CORRECTION;
+double multiplier = SAMPLING_CORRECTION;
 int max_value = MAX_VALUE;
 int bin_size = BIN_SIZE;
 int bucket_size = BUCKET_SIZE;
@@ -198,7 +198,7 @@ void CEEngine::insertTuple(const std::vector<int>& tuple)
     }
 
     curr_size++;
-    multiplier = SAMPLING_CORRECTION * (double)(init_size)/curr_size;
+    multiplier = (double) curr_size / (init_size*SAMPLING_RATE + (curr_size - init_size));
 }
 
 void CEEngine::deleteTuple(const std::vector<int>& tuple, int tupleId)
@@ -229,7 +229,7 @@ void CEEngine::deleteTuple(const std::vector<int>& tuple, int tupleId)
     
     if(curr_size){
         curr_size--;
-        multiplier = SAMPLING_CORRECTION * (double)(init_size)/curr_size;
+        multiplier = (double) curr_size / (init_size*SAMPLING_RATE + (curr_size - init_size));
     }
 }
 
@@ -248,9 +248,11 @@ int CEEngine::query(const std::vector<CompareExpression>& quals)
             // }
 
             //Probabilistic (proven best on tests)
-            int estimation = quals[0].columnIdx == 0 ? (buckets_of_A1[quals[0].value/bucket_size]/bucket_size)*SAMPLING_CORRECTION : (buckets_of_B1[quals[0].value/bucket_size]/bucket_size)*SAMPLING_CORRECTION;
-            return estimation;
-            
+            // int estimation = quals[0].columnIdx == 0 ? ((double)(buckets_of_A1[quals[0].value/bucket_size])/bucket_size)*multiplier : ((double)(buckets_of_B1[quals[0].value/bucket_size])/bucket_size)*multiplier;
+            // return estimation;
+            //Probabilistic (untested, makes more sense)
+            return curr_size/max_value;
+
             //return 0;
         }
 
@@ -351,7 +353,33 @@ int CEEngine::query(const std::vector<CompareExpression>& quals)
             #endif
 
             //Case 2: (A = x AND B > y)
-            return curr_size/max_value;
+            int total_count = 0;
+            //Equal
+            // double eqEstimation = quals[0].columnIdx == 0 ? ((double)(buckets_of_A1[quals[0].value/bucket_size])/bucket_size)*multiplier : ((double)(buckets_of_B1[quals[0].value/bucket_size])/bucket_size)*multiplier;
+            //Greater
+            int size = BUCKETS;
+            int value = quals[1].value;
+            int index = value/bucket_size+1 < size ? value/bucket_size+1 : size-1;
+            if (quals[1].columnIdx == 0) {
+                for(int i=0; i < 15; i++) {
+                    if(index % 2 == 1)
+                        total_count += ((u_int32_t*)buckets_of_A[i])[index++];
+                    index /= 2;
+                }
+                for(int i = index;i<4;i++)
+                    total_count += ((u_int32_t*)buckets_of_A[15])[i];
+            } else {
+                for(int i=0; i < 15; i++) {
+                    if(index % 2 == 1)
+                        total_count += ((u_int32_t*)buckets_of_B[i])[index++];
+                    index /= 2;
+                }
+                for(int i = index;i<4;i++)
+                    total_count += ((u_int32_t*)buckets_of_B[15])[i];
+            }
+
+            //Return the estimation for the first column multiplied by the ratio of the second column
+            return ((double)(curr_size)/max_value)*((double)(total_count*multiplier)/curr_size);
         }
 
         // A > x AND B = y
@@ -369,7 +397,33 @@ int CEEngine::query(const std::vector<CompareExpression>& quals)
             #endif
 
             //Case 2: (A > x AND B = y)
-            return curr_size/max_value;
+            int total_count = 0;
+            //Equal
+            // double eqEstimation = quals[1].columnIdx == 0 ? ((double)(buckets_of_A1[quals[1].value/bucket_size])/bucket_size)*multiplier : ((double)(buckets_of_B1[quals[1].value/bucket_size])/bucket_size)*multiplier;
+            //Greater
+            int size = BUCKETS;
+            int value = quals[0].value;
+            int index = value/bucket_size+1 < size ? value/bucket_size+1 : size-1;
+            if (quals[0].columnIdx == 0) {
+                for(int i=0; i < 15; i++) {
+                    if(index % 2 == 1)
+                        total_count += ((u_int32_t*)buckets_of_A[i])[index++];
+                    index /= 2;
+                }
+                for(int i = index;i<4;i++)
+                    total_count += ((u_int32_t*)buckets_of_A[15])[i];
+            } else {
+                for(int i=0; i < 15; i++) {
+                    if(index % 2 == 1)
+                        total_count += ((u_int32_t*)buckets_of_B[i])[index++];
+                    index /= 2;
+                }
+                for(int i = index;i<4;i++)
+                    total_count += ((u_int32_t*)buckets_of_B[15])[i];
+            }
+
+            //Return the estimation for the first column multiplied by the ratio of the second column
+            return ((double)(curr_size)/max_value)*((double)(total_count*multiplier)/curr_size);
         }
 
         // A > x AND B > y
@@ -424,26 +478,26 @@ int CEEngine::query(const std::vector<CompareExpression>& quals)
             size = BINS;
             
             //Estimation for first row/column
-            index_a = A/bin_size < BINS ? A/bin_size : BINS-1;
-            index_b = B/bin_size < BINS ? B/bin_size : BINS-1;
-            for (int i=index_b; i<size; i++) {
-                total_count += ((u_int32_t(*)[size])histogram[0])[index_a][i] / 2;
-            }
-            for (int i=index_a; i<size; i++) {
-                total_count += ((u_int32_t(*)[size])histogram[0])[i][index_b] / 2;
-            }
+            // index_a = A/bin_size < BINS ? A/bin_size : BINS-1;
+            // index_b = B/bin_size < BINS ? B/bin_size : BINS-1;
+            // for (int i=index_b; i<size; i++) {
+            //     total_count += ((u_int32_t(*)[size])histogram[0])[index_a][i] / 2;
+            // }
+            // for (int i=index_a; i<size; i++) {
+            //     total_count += ((u_int32_t(*)[size])histogram[0])[i][index_b] / 2;
+            // }
 
-            total_count -= ((u_int32_t(*)[size])histogram[0])[index_a][index_b] / 2;
+            // total_count -= ((u_int32_t(*)[size])histogram[0])[index_a][index_b] / 2;
 
-            //Invalidate further calculations if the search is already at the last row/column
-            if(index_a != BINS-1 && index_b != BINS-1) {
-                index_a = A/bin_size+1 < size ? A/bin_size+1  : size-1;
-                index_b = B/bin_size+1 < size ? B/bin_size+1  : size-1;
-            }
-            else{
-                index_a = size;
-                index_b = size;
-            }
+            // //Invalidate further calculations if the search is already at the last row/column
+            // if(index_a != BINS-1 && index_b != BINS-1) {
+            //     index_a = A/bin_size+1 < size ? A/bin_size+1  : size-1;
+            //     index_b = B/bin_size+1 < size ? B/bin_size+1  : size-1;
+            // }
+            // else{
+            //     index_a = size;
+            //     index_b = size;
+            // }
 
             index_a = A/bin_size+1 < size ? A/bin_size+1  : size-1;
             index_b = B/bin_size+1 < size ? B/bin_size+1  : size-1;
@@ -532,7 +586,7 @@ CEEngine::CEEngine(int num, DataExecuter *dataExecuter)
 
             A = data[j][0];
             B = data[j][1];
-
+            
             // bloomFilter.insert(A, B);
             // CMS_A.insert(A);
             // CMS_B.insert(B);
@@ -556,6 +610,6 @@ CEEngine::CEEngine(int num, DataExecuter *dataExecuter)
                 size /= 2;
             }
         }
-    }
+    }    
     data.clear();
 }
