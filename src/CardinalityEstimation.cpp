@@ -642,11 +642,4 @@ CEEngine::CEEngine(int num, DataExecuter *dataExecuter) {
         }
     }    
     data.clear();
-    int cms_count = 0;
-    int cms_step = MAX_VALUE/1000;
-    for (int i=0;i<1000;i++){
-        cms_count+=CMS_AB.query(i*cms_step,i*cms_step+1);
-    }
-    cms_noise = cms_count/1000;
-    //std::cout << "CMS Noise: " << cms_noise << std::endl;
 }
