@@ -1,0 +1,18 @@
+CMS_size = 10,000(width) * 32(depth)
+
+Table = 40mil
+
+Sampling rate = 2%
+
+CMS_inserts() = 1mil
+CMS entries = CMS inserts()*depth
+
+Outliers = ???
+
+( CMS_inserts() - Outliers ) / CMS(width) = CMS_noise
+
+
+( 40mil - 9mil ***SAMPLING RATE MISSING :: 620K*** ) / 10,000
+
+
+620k / 10K = **62**
