@@ -5,12 +5,23 @@
 
 #include <executer/DataExecuterDemo.h>
 
+//DEBUG
+int check = 0;
+
 std::unordered_map<int, bool> vis;
 DataExecuterDemo::DataExecuterDemo(int end, int count) : DataExecuter()
 {
     this->end = end;
     this->count = count;
-    for (int i = 0; i <= end; ++i) {
+    for (int i = 0; i < 9000; ++i) {
+        for(int j = 0; j < 1000; j++){
+            std::vector<int> tuple;
+            tuple.push_back(i*100);
+            tuple.push_back(i*100);
+            set.push_back(tuple);
+        }
+    }
+    for (int i = 9000000; i <= end; ++i) {
         std::vector<int> tuple;
         tuple.push_back(rand() % MAX_VALUE + 1);
         tuple.push_back(rand() % MAX_VALUE + 1);
@@ -58,7 +69,24 @@ Action DataExecuterDemo::getNextAction()
         action.actionType = NONE;
         return action;
     }
-    if (count % 100 == 99) {
+    else if (count>19975){
+        action.actionType = QUERY;
+        int columnIdx = rand() % 2;
+        if(rand()%2){
+            CompareExpression expr1 = {columnIdx, CompareOp(EQUAL), check};
+            action.quals.push_back(expr1);
+            CompareExpression expr2 = {columnIdx ? 0 : 1, CompareOp(EQUAL), check};
+            action.quals.push_back(expr2);
+            check+=100;
+        }
+        else{
+            CompareExpression expr1 = {columnIdx, CompareOp(EQUAL), rand() % MAX_VALUE + 1};
+            action.quals.push_back(expr1);
+            CompareExpression expr2 = {columnIdx ? 0 : 1, CompareOp(EQUAL), rand() % MAX_VALUE + 1};
+            action.quals.push_back(expr2);
+        }
+    }
+    else if (count % 100 == 99) {
         action.actionType = QUERY;
         CompareExpression expr = {rand() % 2, CompareOp(rand() % 2), rand() % MAX_VALUE + 1};
         action.quals.push_back(expr);
@@ -104,7 +132,7 @@ double DataExecuterDemo::answer(int ans)
             cnt++;
     }
     double error = fabs(std::log((ans + 1) * 1.0 / (cnt + 1)));
-    // if(curAction.quals.size() == 2)
-    //     printf("Real: %d\t\tEstimate: %d\n",cnt,ans);
+    if (curAction.quals.size() == 2 && curAction.quals[0].compareOp == EQUAL && curAction.quals[1].compareOp == EQUAL)
+        std::cout << cnt << std::endl;
     return error;
 };

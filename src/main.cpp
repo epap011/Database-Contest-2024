@@ -3,8 +3,8 @@
 
 int main(int argc, char *argv[])
 {
-    int initSize = 1000000; // Initial data size.
-    int opSize = 10000;    // Number of operations.
+    int initSize = 40000000; // Initial data size.
+    int opSize = 20000;    // Number of operations.
     double SingleEqualScore = 0;
     double SingleGreaterScore = 0;
     double DoubleEqualScore = 0;
@@ -17,7 +17,7 @@ int main(int argc, char *argv[])
     int DoubleGreaterCnt = 0;
     int DoubleGreaterEqualCnt = 0;
     int cnt = 0;
-    std::string message = "Average score: ";
+    std::string message = "Equalities CMS tests - [40mil 25k]\nAverage score: ";
     
     auto start = std::chrono::high_resolution_clock::now();
     DataExecuterDemo dataExecuter(initSize - 1, opSize);
@@ -43,6 +43,8 @@ int main(int argc, char *argv[])
            ceEngine.deleteTuple(action.actionTuple, action.tupleId);
         } else if (action.actionType == QUERY) {
             int ans = ceEngine.query(action.quals);
+            if (action.quals.size() == 2 && action.quals[0].compareOp == EQUAL && action.quals[1].compareOp == EQUAL)
+                std::cout<< "A=x AND B=y: estimate->" << ans << " real->";
             double realAns = dataExecuter.answer(ans);
             score += realAns;
             cnt++;
