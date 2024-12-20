@@ -5,6 +5,9 @@
 #include <functional> // For std::hash
 #include <string>     // For combining keys
 #include <climits>    // For INT_MAX
+#include <bitset>
+#include <unordered_map>
+#include <iostream>
 
 #define MEM_LIMIT_BYTES 4194304
 #define MAX_VALUE 20000000
@@ -16,45 +19,37 @@
 #define SAMPLING_RATE 0.02
 #define SAMPLING_CORRECTION (1/SAMPLING_RATE)
 
+// Constants for Layer 1
+const size_t BITMAP_SIZE = 1024;    // Size of each bitmap in Layer 1
+const size_t NUM_BITMAPS = 512;     // Number of bitmaps in Layer 1
+const size_t THRESHOLD   = 100;     // Threshold for promoting to Layer 2
+
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-class CountMinSketch {// Example memory per CMS = 10,000(WIDTH) * 32(DEPTH) * 4(BYTES)=1,280,000bytes (1.28 MB per CMS).
+class HyperLogLog {
 private:
-    int width; // Number of columns in the sketch
-    int depth; // Number of hash functions (rows)
-    std::vector<std::vector<int>> table; // 2D table to store counts
-    std::vector<std::hash<std::string>> hashFunctions; // Hash functions
+    std::vector<uint8_t> registers;
+    size_t numRegisters;
 
 public:
-    CountMinSketch(int width, int depth) : width(width), depth(depth), table(depth, std::vector<int>(width, 0)) {
-        // Initialize hash functions (std::hash<string> acts as hash functions)
-        for (int i = 0; i < depth; ++i) {
-            hashFunctions.emplace_back(std::hash<std::string>());
-        }
+    HyperLogLog(size_t numRegisters) : numRegisters(numRegisters), registers(numRegisters, 0) {}
+
+    void add(uint64_t hash) {
+        size_t index = hash % numRegisters;
+        uint8_t rank = __builtin_clzll(hash / numRegisters) + 1; // Leading zero count
+        registers[index] = std::max(registers[index], rank);
     }
 
-    // Insert an item into the sketch
-    void insert(int keyA, int keyB) {
-        std::string keyStr = std::to_string(keyA) + ":" + std::to_string(keyB);
-        for (int i = 0; i < depth; ++i) {
-            size_t hashVal = hashFunctions[i](keyStr);
-            table[i][hashVal % width] += 1;
+    double estimate() const {
+        double alpha = 0.7213 / (1 + 1.079 / numRegisters);
+        double Z = 0;
+        for (uint8_t reg : registers) {
+            Z += 1.0 / (1 << reg);
         }
-    }
-
-    // Query the approximate count of a key
-    int query(int keyA, int keyB) const {
-        std::string keyStr = std::to_string(keyA) + ":" + std::to_string(keyB);
-        int minCount = INT_MAX; // Start with a large value
-        for (int i = 0; i < depth; ++i) {
-            size_t hashVal = hashFunctions[i](keyStr);
-            minCount = std::min(minCount, table[i][hashVal % width]);
-        }
-        return minCount;
+        Z = 1 / Z;
+        double rawEstimate = alpha * numRegisters * numRegisters * Z;
+        return rawEstimate; // Raw estimate without bias correction
     }
 };
-
-CountMinSketch CMS_AB(4000, 32); // 4000 * 32 * 4 = 512000 Bytes = 0.5 MB
-int cms_noise = 0;
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 //----------------------------------------------------------------------------------------------------
@@ -127,6 +122,14 @@ int max_value       = MAX_VALUE;
 int bin_size        = BIN_SIZE;
 int bucket_size     = BUCKET_SIZE;
 //Total Memory for data structure: 1,003 + 0.99 + 0.99 = 2.97 MB
+
+std::vector<std::bitset<BITMAP_SIZE>> layer1(NUM_BITMAPS); // Layer 1 bitmaps
+std::unordered_map<size_t, HyperLogLog> layer2;            // Layer 2 estimators (indexed by hash)
+
+size_t hashFunction(int a, int b) {
+    std::hash<std::string> hasher;
+    return hasher(std::to_string(a) + "," + std::to_string(b));
+}
 
 void CEEngine::insertTuple(const std::vector<int>& tuple) {
     u_int32_t A = tuple[0];
@@ -578,25 +581,6 @@ CEEngine::CEEngine(int num, DataExecuter *dataExecuter) {
     std::vector<std::vector<int>> data;
     u_int32_t A,B;
 
-    // Sample table for max value, to assign appropriate bin and bucket sizes
-
-    // max_value = 0;
-    // for (int k = 0; k < 4; k++) {
-    //     data.clear();
-    //     dataExecuter->readTuples(k*(num/4), 5000, data);
-    //     for (int i = 0; i < 5000; i++) {
-    //         A = data[i][0];
-    //         B = data[i][1];
-    //         if(A > max_value) max_value = A;
-    //         if(B > max_value) max_value = B;
-    //     }
-    // }
-    // data.clear();
-
-    // Round up max value to the nearest 100,000 (seems not necessary)
-    //max_value = ((max_value + 99999) / 100000) * 100000;
-    //std::cout << "Max Value: " << max_value << std::endl;
-
     //Adjust bin and bucket sizes dynamically, based on max value
     bin_size = max_value/BINS;
     bucket_size = max_value/BUCKETS;
@@ -609,7 +593,23 @@ CEEngine::CEEngine(int num, DataExecuter *dataExecuter) {
             A = data[j][0];
             B = data[j][1];
 
-            CMS_AB.insert(A,B);
+        size_t hash        = hashFunction(A, B);
+        size_t bitmapIndex = hash % NUM_BITMAPS;
+        size_t bitIndex    = hash % BITMAP_SIZE;
+
+        // Update Layer 1
+        layer1[bitmapIndex].set(bitIndex);
+
+        // Check if the bitmap exceeds the threshold
+        if (layer1[bitmapIndex].count() >= THRESHOLD) {
+            // Promote to Layer 2
+            if (layer2.find(bitmapIndex) == layer2.end()) {
+                layer2[bitmapIndex] = HyperLogLog(64); // Initialize with 64 registers
+            }
+            layer2[bitmapIndex].add(hash);
+        }
+
+            
 
             int index_a, index_b, size;
 
