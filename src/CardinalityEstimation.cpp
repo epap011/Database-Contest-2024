@@ -8,8 +8,9 @@
 
 #define MEM_LIMIT_BYTES 4194304
 #define MAX_VALUE 20000000
-#define BUCKETS 524288
+#define BUCKETS 262144 //524288
 #define BUCKET_SIZE (MAX_VALUE/BUCKETS)
+#define BUCKET_LAYERS 16
 #define BINS 512
 #define BIN_SIZE (MAX_VALUE/BINS)
 #define OFFSET 250000
@@ -90,55 +91,55 @@ void* histogram[8] = {histogram512, histogram256, histogram128, histogram64, his
 //----------------------------------------------------------------------------------------------------
 
 //----------------------------------------------------------------------------------------------------
-//Total Memory for buckets_of_A: 1.062713623046875 MB
-u_int8_t buckets_of_A1[BUCKETS]         = {0};      //524,288 * 1 = 524,288 Bytes = 0.5 MB
-u_int8_t buckets_of_A2[BUCKETS/2]       = {0};      //262,144 * 1 = 262,144 Bytes = 0.25 MB
-u_int8_t buckets_of_A3[BUCKETS/4]       = {0};      //131,072 * 1 = 131,072 Bytes = 0.125 MB
-u_int16_t buckets_of_A4[BUCKETS/8]      = {0};      //65,536  * 2 = 131,072 Bytes = 0.125 MB
-u_int16_t buckets_of_A5[BUCKETS/16]     = {0};      //32,768  * 2 = 65,536 Bytes  = 0.0625 MB
-u_int16_t buckets_of_A6[BUCKETS/32]     = {0};      //16,384  * 2 = 32,768 Bytes  = 0.03125 MB
-u_int16_t buckets_of_A7[BUCKETS/64]     = {0};      //8,192   * 2 = 16,384 Bytes  = 0.015625 MB
-u_int16_t buckets_of_A8[BUCKETS/128]    = {0};      //4,096   * 2 = 8,192 Bytes   = 0.0078125 MB
-u_int16_t buckets_of_A9[BUCKETS/256]    = {0};      //2,048   * 2 = 4,096 Bytes   = 0.00390625 MB
-u_int16_t buckets_of_A10[BUCKETS/512]   = {0};      //1,024   * 2 = 2,048 Bytes   = 0.001953125 MB
-u_int16_t buckets_of_A11[BUCKETS/1024]  = {0};      //512     * 2 = 1,024 Bytes   = 0.0009765625 MB
-u_int16_t buckets_of_A12[BUCKETS/2048]  = {0};      //256     * 2 = 512 Bytes     = 0.00048828125 MB
-u_int32_t buckets_of_A13[BUCKETS/4096]  = {0};      //128     * 4 = 512 Bytes     = 0.00048828125 MB
-u_int32_t buckets_of_A14[BUCKETS/8192]  = {0};      //64      * 4 = 256 Bytes     = 0.000244140625 MB
-u_int32_t buckets_of_A15[BUCKETS/16384] = {0};      //32      * 4 = 128 Bytes     = 0.0001220703125 MB
-u_int32_t buckets_of_A16[BUCKETS/32768] = {0};      //16      * 4 = 64 Bytes      = 0.00006103515625 MB
-u_int32_t buckets_of_A17[BUCKETS/65536] = {0};      //8       * 4 = 32 Bytes      = 0.000030517578125 MB
+//Total Memory for buckets_of_A: 0.625457764 MB
+u_int8_t buckets_of_A1[BUCKETS]         = {0};      // 262,144 * 1 = 262,144 Bytes = 0.25 MB
+u_int8_t buckets_of_A2[BUCKETS/2]       = {0};      // 131,072 * 1 = 131,072 Bytes = 0.125 MB
+u_int8_t buckets_of_A3[BUCKETS/4]       = {0};      // 65,536  * 1 = 65,536 Bytes  = 0.0625 MB
+u_int16_t buckets_of_A4[BUCKETS/8]      = {0};      // 32,768  * 2 = 65,536 Bytes  = 0.0625 MB
+u_int16_t buckets_of_A5[BUCKETS/16]     = {0};      // 16,384  * 2 = 32,768 Bytes  = 0.03125 MB
+u_int16_t buckets_of_A6[BUCKETS/32]     = {0};      // 8,192   * 2 = 16,384 Bytes  = 0.015625 MB
+u_int16_t buckets_of_A7[BUCKETS/64]     = {0};      // 4,096   * 2 = 8,192 Bytes   = 0.0078125 MB
+u_int16_t buckets_of_A8[BUCKETS/128]    = {0};      // 2,048   * 2 = 4,096 Bytes   = 0.00390625 MB
+u_int16_t buckets_of_A9[BUCKETS/256]    = {0};      // 1,024   * 2 = 2,048 Bytes   = 0.001953125 MB
+u_int16_t buckets_of_A10[BUCKETS/512]   = {0};      // 512     * 2 = 1,024 Bytes   = 0.0009765625 MB
+u_int16_t buckets_of_A11[BUCKETS/1024]  = {0};      // 256     * 2 = 512 Bytes     = 0.00048828125 MB
+u_int16_t buckets_of_A12[BUCKETS/2048]  = {0};      // 128     * 2 = 256 Bytes     = 0.000244140625 MB
+u_int32_t buckets_of_A13[BUCKETS/4096]  = {0};      // 64      * 4 = 256 Bytes     = 0.000244140625 MB
+u_int32_t buckets_of_A14[BUCKETS/8192]  = {0};      // 32      * 4 = 128 Bytes     = 0.0001220703125 MB
+u_int32_t buckets_of_A15[BUCKETS/16384] = {0};      // 16      * 4 = 64 Bytes      = 0.00006103515625 MB
+u_int32_t buckets_of_A16[BUCKETS/32768] = {0};      // 8       * 4 = 32 Bytes      = 0.000030517578125 MB
+//u_int32_t buckets_of_A17[BUCKETS/65536] = {0};    30517578125 MB
 //----------------------------------------------------------------------------------------------------
 
 //----------------------------------------------------------------------------------------------------
 // Total Memory for pointers of buckets of A = 17pointers x 8Bytes = 0.0001297MB
-void *buckets_of_A[17] = {buckets_of_A1, buckets_of_A2, buckets_of_A3, buckets_of_A4, buckets_of_A5, buckets_of_A6, buckets_of_A7, buckets_of_A8, buckets_of_A9, buckets_of_A10, buckets_of_A11, buckets_of_A12, buckets_of_A13, buckets_of_A14, buckets_of_A15, buckets_of_A16, buckets_of_A17};
+void *buckets_of_A[BUCKET_LAYERS] = {buckets_of_A1, buckets_of_A2, buckets_of_A3, buckets_of_A4, buckets_of_A5, buckets_of_A6, buckets_of_A7, buckets_of_A8, buckets_of_A9, buckets_of_A10, buckets_of_A11, buckets_of_A12, buckets_of_A13, buckets_of_A14, buckets_of_A15, buckets_of_A16};
 //----------------------------------------------------------------------------------------------------
 
 //----------------------------------------------------------------------------------------------------
-//Total Memory for buckets_of_B: 1.062713623046875 MB
-u_int8_t buckets_of_B1[BUCKETS]         = {0};      //524,288 * 1 = 524,288 Bytes = 0.5 MB
-u_int8_t buckets_of_B2[BUCKETS/2]       = {0};      //262,144 * 1 = 262,144 Bytes = 0.25 MB
-u_int8_t buckets_of_B3[BUCKETS/4]       = {0};      //131,072 * 1 = 131,072 Bytes = 0.125 MB
-u_int16_t buckets_of_B4[BUCKETS/8]      = {0};      //65,536  * 2 = 131,072 Bytes = 0.125 MB
-u_int16_t buckets_of_B5[BUCKETS/16]     = {0};      //32,768  * 2 = 65,536 Bytes  = 0.0625 MB
-u_int16_t buckets_of_B6[BUCKETS/32]     = {0};      //16,384  * 2 = 32,768 Bytes  = 0.03125 MB
-u_int16_t buckets_of_B7[BUCKETS/64]     = {0};      //8,192   * 2 = 16,384 Bytes  = 0.015625 MB
-u_int16_t buckets_of_B8[BUCKETS/128]    = {0};      //4,096   * 2 = 8,192 Bytes   = 0.0078125 MB
-u_int16_t buckets_of_B9[BUCKETS/256]    = {0};      //2,048   * 2 = 4,096 Bytes   = 0.00390625 MB
-u_int16_t buckets_of_B10[BUCKETS/512]   = {0};      //1,024   * 2 = 2,048 Bytes   = 0.001953125 MB
-u_int16_t buckets_of_B11[BUCKETS/1024]  = {0};      //512     * 2 = 1,024 Bytes   = 0.0009765625 MB
-u_int16_t buckets_of_B12[BUCKETS/2048]  = {0};      //256     * 2 = 512 Bytes     = 0.00048828125 MB
-u_int32_t buckets_of_B13[BUCKETS/4096]  = {0};      //128     * 4 = 512 Bytes     = 0.00048828125 MB
-u_int32_t buckets_of_B14[BUCKETS/8192]  = {0};      //64      * 4 = 256 Bytes     = 0.000244140625 MB
-u_int32_t buckets_of_B15[BUCKETS/16384] = {0};      //32      * 4 = 128 Bytes     = 0.0001220703125 MB
-u_int32_t buckets_of_B16[BUCKETS/32768] = {0};      //16      * 4 = 64 Bytes      = 0.00006103515625 MB
-u_int32_t buckets_of_B17[BUCKETS/65536] = {0};      //8       * 4 = 32 Bytes      = 0.000030517578125 MB
+//Total Memory for buckets_of_B: 0.625457764 MB
+u_int8_t buckets_of_B1[BUCKETS]         = {0};      //262,144 * 1 = 262,144 Bytes = 0.25 MB
+u_int8_t buckets_of_B2[BUCKETS/2]       = {0};      //131,072 * 1 = 131,072 Bytes = 0.125 MB
+u_int8_t buckets_of_B3[BUCKETS/4]       = {0};      //65,536  * 2 = 131,072 Bytes = 0.125 MB
+u_int16_t buckets_of_B4[BUCKETS/8]      = {0};      //32,768  * 2 = 65,536 Bytes  = 0.0625 MB
+u_int16_t buckets_of_B5[BUCKETS/16]     = {0};      //16,384  * 2 = 32,768 Bytes  = 0.03125 MB
+u_int16_t buckets_of_B6[BUCKETS/32]     = {0};      //8,192   * 2 = 16,384 Bytes  = 0.015625 MB
+u_int16_t buckets_of_B7[BUCKETS/64]     = {0};      //4,096   * 2 = 8,192 Bytes   = 0.0078125 MB
+u_int16_t buckets_of_B8[BUCKETS/128]    = {0};      //2,048   * 2 = 4,096 Bytes   = 0.00390625 MB
+u_int16_t buckets_of_B9[BUCKETS/256]    = {0};      //1,024   * 2 = 2,048 Bytes   = 0.001953125 MB
+u_int16_t buckets_of_B10[BUCKETS/512]   = {0};      //512     * 2 = 1,024 Bytes   = 0.0009765625 MB
+u_int16_t buckets_of_B11[BUCKETS/1024]  = {0};      //256     * 2 = 512 Bytes     = 0.00048828125 MB  
+u_int16_t buckets_of_B12[BUCKETS/2048]  = {0};      //128     * 4 = 512 Bytes     = 0.00048828125 MB
+u_int32_t buckets_of_B13[BUCKETS/4096]  = {0};      //64      * 4 = 256 Bytes     = 0.000244140625 MB
+u_int32_t buckets_of_B14[BUCKETS/8192]  = {0};      //32      * 4 = 128 Bytes     = 0.0001220703125 MB
+u_int32_t buckets_of_B15[BUCKETS/16384] = {0};      //16      * 4 = 64 Bytes      = 0.00006103515625 MB
+u_int32_t buckets_of_B16[BUCKETS/32768] = {0};      //8       * 4 = 32 Bytes      = 0.000030517578125 MB
+//u_int32_t buckets_of_B17[BUCKETS/65536] = {0};
 //----------------------------------------------------------------------------------------------------
 
 //----------------------------------------------------------------------------------------------------
 // Total Memory for pointers of buckets of B = 17pointers x 8Bytes = 0.0001297MB
-void *buckets_of_B[17] = {buckets_of_B1, buckets_of_B2, buckets_of_B3, buckets_of_B4, buckets_of_B5, buckets_of_B6, buckets_of_B7, buckets_of_B8, buckets_of_B9, buckets_of_B10, buckets_of_B11, buckets_of_B12, buckets_of_B13, buckets_of_B14, buckets_of_B15, buckets_of_B16, buckets_of_B17};
+void *buckets_of_B[BUCKET_LAYERS] = {buckets_of_B1, buckets_of_B2, buckets_of_B3, buckets_of_B4, buckets_of_B5, buckets_of_B6, buckets_of_B7, buckets_of_B8, buckets_of_B9, buckets_of_B10, buckets_of_B11, buckets_of_B12, buckets_of_B13, buckets_of_B14, buckets_of_B15, buckets_of_B16};
 //----------------------------------------------------------------------------------------------------
 
 //----------------------------------------------------------------------------------------------------
@@ -172,7 +173,7 @@ void CEEngine::insertTuple(const std::vector<int>& tuple) {
     }
 
     size = BUCKETS;
-    for (int i = 0; i < 17; i++) {
+    for (int i = 0; i < BUCKET_LAYERS; i++) {
         index_a = A/(max_value/size) < size ? A/(max_value/size) : size-1;
         index_b = B/(max_value/size) < size ? B/(max_value/size) : size-1;
         if(i<3){
@@ -209,7 +210,7 @@ void CEEngine::deleteTuple(const std::vector<int>& tuple, int tupleId) {
     }
 
     size = BUCKETS;
-    for (int i = 0; i < 17; i++){
+    for (int i = 0; i < BUCKET_LAYERS; i++){
         index_a = A/(max_value/size) < size ? A/(max_value/size) : size-1;
         index_b = B/(max_value/size) < size ? B/(max_value/size) : size-1;
         if(i<3){
@@ -261,7 +262,7 @@ int CEEngine::query(const std::vector<CompareExpression>& quals) {
 
             // A > x
             if (quals[0].columnIdx == 0) {
-                for(int i=0; i < 16; i++) {
+                for(int i=0; i < BUCKET_LAYERS-1; i++) {
                     if(index % 2 == 1){
                         if(i<3)
                             total_count += ((u_int8_t*)buckets_of_A[i])[index++];
@@ -273,11 +274,11 @@ int CEEngine::query(const std::vector<CompareExpression>& quals) {
                     index /= 2;
                 }
                 for(int i = index;i<8;i++)
-                    total_count += ((u_int32_t*)buckets_of_A[16])[i];
+                    total_count += ((u_int32_t*)buckets_of_A[BUCKET_LAYERS-1])[i];
 
             // B > X
             } else {
-                for(int i=0; i < 16; i++) {
+                for(int i=0; i < BUCKET_LAYERS-1; i++) {
                     if(index % 2 == 1){
                         if(i<3)
                             total_count += ((u_int8_t*)buckets_of_B[i])[index++];
@@ -289,7 +290,7 @@ int CEEngine::query(const std::vector<CompareExpression>& quals) {
                     index /= 2;
                 }
                 for(int i = index;i<8;i++)
-                    total_count += ((u_int32_t*)buckets_of_B[16])[i];
+                    total_count += ((u_int32_t*)buckets_of_B[BUCKET_LAYERS-1])[i];
             }
 
             return total_count*multiplier;
@@ -327,7 +328,7 @@ int CEEngine::query(const std::vector<CompareExpression>& quals) {
             int value = quals[1].value;
             int index = value/bucket_size+1 < size ? value/bucket_size+1 : size-1;
             if (quals[1].columnIdx == 0) {
-                for(int i=0; i < 16; i++) {
+                for(int i=0; i < BUCKET_LAYERS-1; i++) {
                     if(index % 2 == 1){
                         if(i<3)
                             total_count += ((u_int8_t*)buckets_of_A[i])[index++];
@@ -339,9 +340,9 @@ int CEEngine::query(const std::vector<CompareExpression>& quals) {
                     index /= 2;
                 }
                 for(int i = index;i<8;i++)
-                    total_count += ((u_int32_t*)buckets_of_A[16])[i];
+                    total_count += ((u_int32_t*)buckets_of_A[BUCKET_LAYERS-1])[i];
             } else {
-                for(int i=0; i < 16; i++) {
+                for(int i=0; i < BUCKET_LAYERS-1; i++) {
                     if(index % 2 == 1){
                         if(i<3)
                             total_count += ((u_int8_t*)buckets_of_B[i])[index++];
@@ -353,7 +354,7 @@ int CEEngine::query(const std::vector<CompareExpression>& quals) {
                     index /= 2;
                 }
                 for(int i = index;i<8;i++)
-                    total_count += ((u_int32_t*)buckets_of_B[16])[i];
+                    total_count += ((u_int32_t*)buckets_of_B[BUCKET_LAYERS-1])[i];
             }
 
             //Return the estimation for the first column multiplied by the ratio of the second column
@@ -382,9 +383,9 @@ int CEEngine::query(const std::vector<CompareExpression>& quals) {
                     index /= 2;
                 }
                 for(int i = index;i<8;i++)
-                    total_count += ((u_int32_t*)buckets_of_A[16])[i];
+                    total_count += ((u_int32_t*)buckets_of_A[BUCKET_LAYERS-1])[i];
             } else {
-                for(int i=0; i < 16; i++) {
+                for(int i=0; i < BUCKET_LAYERS-1; i++) {
                     if(index % 2 == 1){
                         if(i<3)
                             total_count += ((u_int8_t*)buckets_of_B[i])[index++];
@@ -396,7 +397,7 @@ int CEEngine::query(const std::vector<CompareExpression>& quals) {
                     index /= 2;
                 }
                 for(int i = index;i<8;i++)
-                    total_count += ((u_int32_t*)buckets_of_B[16])[i];
+                    total_count += ((u_int32_t*)buckets_of_B[BUCKET_LAYERS-1])[i];
             }
 
             //Return the estimation for the first column multiplied by the ratio of the second column
@@ -544,7 +545,7 @@ CEEngine::CEEngine(int num, DataExecuter *dataExecuter) {
             }
 
             size = BUCKETS;
-            for (int i = 0; i < 17; i++) {
+            for (int i = 0; i < BUCKET_LAYERS; i++) {
                 index_a = A/(max_value/size) < size ? A/(max_value/size) : size-1;
                 index_b = B/(max_value/size) < size ? B/(max_value/size) : size-1;
                 if(i<3){
