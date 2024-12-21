@@ -10,7 +10,7 @@
 #define MAX_VALUE 20000000
 #define BUCKETS 262144 //524288
 #define BUCKET_SIZE (MAX_VALUE/BUCKETS)
-#define BUCKET_LAYERS 16
+#define BUCKET_LAYERS 17
 #define BINS 512
 #define BIN_SIZE (MAX_VALUE/BINS)
 #define OFFSET 250000
@@ -21,20 +21,16 @@
 // Memory for table = 4,000(WIDTH) * 32(DEPTH) * 4(BYTES)= 512,000 Bytes = 0.48828125 MB
 // Memory for hash functions = 32(DEPTH) * 8(BYTES) = 256 Bytes = 0.000244141MB
 // Total Memory for CountMinSketch: 0.488525391MB
-
-class CountMinSketch {
+class CountMinSketchAB {
 private:
     static constexpr u_int32_t WIDTH = 4000; // Number of columns in the sketch
-    static constexpr u_int32_t DEPTH = 32;  // Number of hash functions (rows)
-    u_int32_t table[DEPTH][WIDTH] = {0};    // 2D table to store counts
-    std::array<std::function<size_t(u_int32_t, u_int32_t)>, DEPTH> hashFunctions; // Hash functions
-    bool singleKeyMode;                     // Flag to determine mode (single or dual key)
+    static constexpr u_int32_t DEPTH = 32;;  // Number of hash functions (rows)
+    u_int32_t table[DEPTH][WIDTH]    = {0};  // 2D table to store counts
+    std::array<std::function<size_t(u_int32_t, u_int32_t)>, DEPTH> hashFunctions;// Hash functions
 
 public:
-    // Default constructor for dual-key mode
-    CountMinSketch() : singleKeyMode(false) {
-        // Initialize hash functions for dual-key mode
-        std::cout << "Dual Key Mode" << std::endl;
+    CountMinSketchAB() {
+        // Initialize hash functions (std::hash<string> acts as hash functions)
         for (u_int32_t i = 0; i < DEPTH; ++i) {
             hashFunctions[i] = [seed = i](u_int32_t keyA, u_int32_t keyB) {
                 return std::hash<u_int32_t>()(keyA) ^ (std::hash<u_int32_t>()(keyB) + seed * 0x9e3779b9);
@@ -42,67 +38,26 @@ public:
         }
     }
 
-    // Constructor for single-key mode
-    CountMinSketch(bool singleKey) : singleKeyMode(singleKey) {
-        // Initialize hash functions for single-key mode
-        std::cout << "Single Key Mode" << std::endl;
-        for (u_int32_t i = 0; i < DEPTH; ++i) {
-            hashFunctions[i] = [seed = i](u_int32_t key, u_int32_t) {
-                return std::hash<u_int32_t>()(key) + seed * 0x9e3779b9;
-            };
-        }
-    }
-
-    // Insert an item for dual-key mode
-    void insertDual(u_int32_t keyA, u_int32_t keyB) {
-        if (singleKeyMode) {
-            throw std::logic_error("insertDual cannot be used in single-key mode.");
-        }
+    // Insert an item into the sketch
+    void insert(u_int32_t keyA, u_int32_t keyB) {
         for (u_int32_t i = 0; i < DEPTH; ++i) {
             size_t hashVal = hashFunctions[i](keyA, keyB);
             table[i][hashVal % WIDTH] += 1;
         }
     }
 
-    // Insert an item for single-key mode
-    void insertSingle(u_int32_t key) {
-        if (!singleKeyMode) {
-            throw std::logic_error("insertSingle cannot be used in dual-key mode.");
-        }
-        for (u_int32_t i = 0; i < DEPTH; ++i) {
-            size_t hashVal = hashFunctions[i](key, 0);
-            table[i][hashVal % WIDTH] += 1;
-        }
-    }
-
-    // Query the approximate count for dual-key mode
-    u_int32_t queryDual(u_int32_t keyA, u_int32_t keyB) const {
-        if (singleKeyMode) {
-            throw std::logic_error("queryDual cannot be used in single-key mode.");
-        }
+    // Query the approximate count of a key
+    u_int32_t query(u_int32_t keyA, u_int32_t keyB) const {
         u_int32_t minCount = std::numeric_limits<u_int32_t>::max();
         for (u_int32_t i = 0; i < DEPTH; ++i) {
             size_t hashVal = hashFunctions[i](keyA, keyB);
-            minCount = std::min(minCount, table[i][hashVal % WIDTH]);
-        }
-        return minCount;
-    }
-
-    // Query the approximate count for single-key mode
-    u_int32_t querySingle(u_int32_t key) const {
-        if (!singleKeyMode) {
-            throw std::logic_error("querySingle cannot be used in dual-key mode.");
-        }
-        u_int32_t minCount = std::numeric_limits<u_int32_t>::max();
-        for (u_int32_t i = 0; i < DEPTH; ++i) {
-            size_t hashVal = hashFunctions[i](key, 0);
             minCount = std::min(minCount, table[i][hashVal % WIDTH]);
         }
         return minCount;
     }
 
     // Print the sketch table
-    void printTable() const {
+    void printTable() {
         for (u_int32_t i = 0; i < DEPTH; ++i) {
             for (u_int32_t j = 0; j < 20; ++j) {
                 std::cout << table[i][j] << " ";
@@ -113,7 +68,56 @@ public:
     }
 };
 
-CountMinSketch CMS_AB;
+class CountMinSketch {
+private:
+    static constexpr u_int32_t WIDTH = 4000; // Number of columns in the sketch
+    static constexpr u_int32_t DEPTH = 32;;  // Number of hash functions (rows)
+    u_int32_t table[DEPTH][WIDTH]    = {0};  // 2D table to store counts
+    std::array<std::function<size_t(u_int32_t, u_int32_t)>, DEPTH> hashFunctions;// Hash functions
+
+public:
+    CountMinSketch() {
+        // Initialize hash functions (std::hash<string> acts as hash functions)
+        for (u_int32_t i = 0; i < DEPTH; ++i) {
+            hashFunctions[i] = [seed = i](u_int32_t key, u_int32_t) {
+                return std::hash<u_int32_t>()(key) + seed * 0x9e3779b9;
+            };
+        }
+    }
+
+    // Insert an item into the sketch
+    void insert(u_int32_t key) {
+        for (u_int32_t i = 0; i < DEPTH; ++i) {
+            size_t hashVal = hashFunctions[i](key, 0);
+            table[i][hashVal % WIDTH] += 1;
+        }
+    }
+
+    // Query the approximate count of a key
+    u_int32_t query(u_int32_t key) const {
+        u_int32_t minCount = std::numeric_limits<u_int32_t>::max();
+        for (u_int32_t i = 0; i < DEPTH; ++i) {
+            size_t hashVal = hashFunctions[i](key, 0);
+            minCount = std::min(minCount, table[i][hashVal % WIDTH]);
+        }
+        return minCount;
+    }
+
+    // Print the sketch table
+    void printTable() {
+        for (u_int32_t i = 0; i < DEPTH; ++i) {
+            for (u_int32_t j = 0; j < 20; ++j) {
+                std::cout << table[i][j] << " ";
+            }
+            std::cout << std::endl;
+        }
+        std::cout << std::endl << std::endl;
+    }
+};
+
+CountMinSketchAB CMS_AB;
+CountMinSketch CMS_A;
+CountMinSketch CMS_B;
 int cms_noise = 0;
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -125,8 +129,8 @@ u_int32_t histogram128[BINS/4][BINS/4]   = {0};     // 128 * 128 * 4 = 16384 Byt
 u_int32_t histogram64[BINS/8][BINS/8]    = {0};     // 64  * 64  * 4 = 4096 Bytes  = 0.00390625 MB
 u_int32_t histogram32[BINS/16][BINS/16]  = {0};     // 32  * 32  * 4 = 1024 Bytes  = 0.0009765625 MB
 u_int32_t histogram16[BINS/32][BINS/32]  = {0};     // 16  * 16  * 4 = 256 Bytes   = 0.000244140625 MB
-u_int32_t histogram8[BINS/64][BINS/64]   = {0};     // 8   * 8   * 4 = 128 Bytes   = 0.0001220703125 MB
-u_int32_t histogram4[BINS/128][BINS/128] = {0};     // 4   * 4   * 4 = 64 Bytes    = 0.00006103515625 MB
+u_int32_t histogram8[BINS/64][BINS/64]   = {0};     //
+u_int32_t histogram4[BINS/128][BINS/128] = {0};     // 
 //----------------------------------------------------------------------------------------------------
 
 //----------------------------------------------------------------------------------------------------
@@ -204,7 +208,9 @@ void CEEngine::insertTuple(const std::vector<int>& tuple) {
     u_int32_t A = tuple[0];
     u_int32_t B = tuple[1];
 
-    CMS_AB.insertDual(A,B);
+    CMS_AB.insert(A,B);
+    CMS_A.insert(A);
+    CMS_B.insert(B);
 
     int index_a, index_b, size;
     
@@ -283,18 +289,12 @@ int CEEngine::query(const std::vector<CompareExpression>& quals) {
     if (quals.size() == 1) {
         // A = x OR B = x | // Time Complexity: O(1)
         if (quals[0].compareOp == EQUAL) {
-            // int index = quals[0].value/bucket_size < BUCKETS ? quals[0].value/bucket_size : BUCKETS-1;
-            // if (quals[0].columnIdx == 0) {
-            //     if (buckets_of_A1[index] >= bucket_size) {return 1;}
-            // } else {
-            //     if (buckets_of_B1[index] >= bucket_size) {return curr_size/MAX_VALUE;}
-            // }
-
             //Probabilistic (proven best on tests)
-            int estimation = quals[0].columnIdx == 0 ? ((double)(buckets_of_A1[quals[0].value/bucket_size])/bucket_size)*multiplier : ((double)(buckets_of_B1[quals[0].value/bucket_size])/bucket_size)*multiplier;
-            return estimation;
-            
+            //int estimation = quals[0].columnIdx == 0 ? ((double)(buckets_of_A1[quals[0].value/bucket_size])/bucket_size)*multiplier : ((double)(buckets_of_B1[quals[0].value/bucket_size])/bucket_size)*multiplier;
+            //return estimation;
             //return 0;
+
+            return quals[0].columnIdx == 0 ? CMS_A.query(quals[0].value) : CMS_B.query(quals[0].value);
         }
 
         // A > x OR B > x | // Time Complexity: O(|Buckets|)
@@ -358,7 +358,7 @@ int CEEngine::query(const std::vector<CompareExpression>& quals) {
                 A=quals[1].value;
                 B=quals[0].value;
             }
-            int cms_count = CMS_AB.queryDual(A,B);
+            int cms_count = CMS_AB.query(A,B);
             return (cms_count > cms_noise*2) ? cms_count -= cms_noise : cms_count = 0;
         }
 
@@ -576,7 +576,7 @@ CEEngine::CEEngine(int num, DataExecuter *dataExecuter) {
             A = data[j][0];
             B = data[j][1];
 
-            CMS_AB.insertDual(A,B);
+            CMS_AB.insert(A,B);
 
             int index_a, index_b, size;
 
