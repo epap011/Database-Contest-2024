@@ -28,9 +28,10 @@ private:
     static constexpr u_int32_t DEPTH = 32;;  // Number of hash functions (rows)
     u_int32_t table[DEPTH][WIDTH]    = {0};  // 2D table to store counts
     std::array<std::function<size_t(u_int32_t, u_int32_t)>, DEPTH> hashFunctions;// Hash functions
+    bool singleKeyMode;
 
 public:
-    CountMinSketch() {
+    CountMinSketch() : singleKeyMode(false) {
         // Initialize hash functions (std::hash<string> acts as hash functions)
         for (u_int32_t i = 0; i < DEPTH; ++i) {
             hashFunctions[i] = [seed = i](u_int32_t keyA, u_int32_t keyB) {
@@ -39,19 +40,58 @@ public:
         }
     }
 
-    // Insert an item into the sketch
-    void insert(u_int32_t keyA, u_int32_t keyB) {
+    CountMinSketch(bool singleKey) : singleKeyMode(singleKey) {
+        // Initialize hash functions
+        for (u_int32_t i = 0; i < DEPTH; ++i) {
+            hashFunctions[i] = [seed = i](u_int32_t key, u_int32_t) {
+                return std::hash<u_int32_t>()(key) + seed * 0x9e3779b9;
+            };
+        }
+    }
+
+    // Insert an item for dual-key mode
+    void insertDual(u_int32_t keyA, u_int32_t keyB) {
+        if (singleKeyMode) {
+            throw std::logic_error("insertDual cannot be used in single-key mode.");
+        }
         for (u_int32_t i = 0; i < DEPTH; ++i) {
             size_t hashVal = hashFunctions[i](keyA, keyB);
             table[i][hashVal % WIDTH] += 1;
         }
     }
 
-    // Query the approximate count of a key
-    u_int32_t query(u_int32_t keyA, u_int32_t keyB) const {
+    // Insert an item for single-key mode
+    void insertSingle(u_int32_t key) {
+        if (!singleKeyMode) {
+            throw std::logic_error("insertSingle cannot be used in dual-key mode.");
+        }
+        for (u_int32_t i = 0; i < DEPTH; ++i) {
+            size_t hashVal = hashFunctions[i](key, 0);
+            table[i][hashVal % WIDTH] += 1;
+        }
+    }
+
+    // Query the approximate count for dual-key mode
+    u_int32_t queryDual(u_int32_t keyA, u_int32_t keyB) const {
+        if (singleKeyMode) {
+            throw std::logic_error("queryDual cannot be used in single-key mode.");
+        }
         u_int32_t minCount = std::numeric_limits<u_int32_t>::max();
         for (u_int32_t i = 0; i < DEPTH; ++i) {
             size_t hashVal = hashFunctions[i](keyA, keyB);
+            minCount = std::min(minCount, table[i][hashVal % WIDTH]);
+        }
+        return minCount;
+    }
+
+    // Query the approximate count for single-key mode
+    u_int32_t querySingle(u_int32_t key) const {
+        if (!singleKeyMode) {
+            throw std::logic_error("querySingle cannot be used in dual-key mode.");
+        }
+        u_int32_t minCount = std::numeric_limits<u_int32_t>::max();
+        for (u_int32_t i = 0; i < DEPTH; ++i) {
+            size_t hashVal = hashFunctions[i](key, 0);
             minCount = std::min(minCount, table[i][hashVal % WIDTH]);
         }
         return minCount;
@@ -69,7 +109,7 @@ public:
     }
 };
 
-CountMinSketch CMS_AB;
+CountMinSketch CMS_AB(false);
 int cms_noise = 0;
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -160,7 +200,7 @@ void CEEngine::insertTuple(const std::vector<int>& tuple) {
     u_int32_t A = tuple[0];
     u_int32_t B = tuple[1];
 
-    CMS_AB.insert(A,B);
+    CMS_AB.insertDual(A,B);
 
     int index_a, index_b, size;
     
@@ -314,7 +354,7 @@ int CEEngine::query(const std::vector<CompareExpression>& quals) {
                 A=quals[1].value;
                 B=quals[0].value;
             }
-            int cms_count = CMS_AB.query(A,B);
+            int cms_count = CMS_AB.queryDual(A,B);
             return (cms_count > cms_noise*2) ? cms_count -= cms_noise : cms_count = 0;
         }
 
@@ -532,7 +572,7 @@ CEEngine::CEEngine(int num, DataExecuter *dataExecuter) {
             A = data[j][0];
             B = data[j][1];
 
-            CMS_AB.insert(A,B);
+            CMS_AB.insertDual(A,B);
 
             int index_a, index_b, size;
 
