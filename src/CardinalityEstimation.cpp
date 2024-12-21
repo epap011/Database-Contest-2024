@@ -17,7 +17,11 @@
 #define SAMPLING_CORRECTION (1/SAMPLING_RATE)
 
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-class CountMinSketch {// Example memory per CMS = 10,000(WIDTH) * 32(DEPTH) * 4(BYTES)=1,280,000bytes (1.28 MB per CMS).
+// Memory for table = 4,000(WIDTH) * 32(DEPTH) * 4(BYTES)= 512,000 Bytes = 0.48828125 MB
+// Memory for hash functions = 32(DEPTH) * 8(BYTES) = 256 Bytes = 0.000244141MB
+// Total Memory for CountMinSketch: 0.488525391MB
+
+class CountMinSketch {
 private:
     static constexpr u_int32_t WIDTH = 4000; // Number of columns in the sketch
     static constexpr u_int32_t DEPTH = 32;;  // Number of hash functions (rows)
@@ -52,6 +56,7 @@ public:
         return minCount;
     }
 
+    // Print the sketch table
     void printTable() {
         for (u_int32_t i = 0; i < DEPTH; ++i) {
             for (u_int32_t j = 0; j < 20; ++j) {
@@ -68,6 +73,7 @@ int cms_noise = 0;
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 //----------------------------------------------------------------------------------------------------
+//Total Memory for histograms: 1.083251953MB
 u_int32_t histogram512[BINS][BINS]       = {0};     // 512 * 512 * 4 = 1048576 Bytes = 1 MB
 u_int32_t histogram256[BINS/2][BINS/2]   = {0};     // 256 * 256 * 4 = 65536 Bytes = 0.0625 MB
 u_int32_t histogram128[BINS/4][BINS/4]   = {0};     // 128 * 128 * 4 = 16384 Bytes = 0.015625 MB
@@ -76,13 +82,15 @@ u_int32_t histogram32[BINS/16][BINS/16]  = {0};     // 32  * 32  * 4 = 1024 Byte
 u_int32_t histogram16[BINS/32][BINS/32]  = {0};     // 16  * 16  * 4 = 256 Bytes   = 0.000244140625 MB
 u_int32_t histogram8[BINS/64][BINS/64]   = {0};     //
 u_int32_t histogram4[BINS/128][BINS/128] = {0};     // 
-//Total Memory for histograms: 1.083251953MB
 //----------------------------------------------------------------------------------------------------
 
 //----------------------------------------------------------------------------------------------------
+//Total Memory for pointers of histograms: 8pointers x 8Bytes = 0.000061035MB
 void* histogram[8] = {histogram512, histogram256, histogram128, histogram64, histogram32, histogram16, histogram8, histogram4};
-// Total Memory for pointers of histograms: 8pointers x 8Bytes = 0.000061035MB
+//----------------------------------------------------------------------------------------------------
 
+//----------------------------------------------------------------------------------------------------
+//Total Memory for buckets_of_A: 1.062713623046875 MB
 u_int8_t buckets_of_A1[BUCKETS]         = {0};      //524,288 * 1 = 524,288 Bytes = 0.5 MB
 u_int8_t buckets_of_A2[BUCKETS/2]       = {0};      //262,144 * 1 = 262,144 Bytes = 0.25 MB
 u_int8_t buckets_of_A3[BUCKETS/4]       = {0};      //131,072 * 1 = 131,072 Bytes = 0.125 MB
@@ -100,13 +108,15 @@ u_int32_t buckets_of_A14[BUCKETS/8192]  = {0};      //64      * 4 = 256 Bytes   
 u_int32_t buckets_of_A15[BUCKETS/16384] = {0};      //32      * 4 = 128 Bytes     = 0.0001220703125 MB
 u_int32_t buckets_of_A16[BUCKETS/32768] = {0};      //16      * 4 = 64 Bytes      = 0.00006103515625 MB
 u_int32_t buckets_of_A17[BUCKETS/65536] = {0};      //8       * 4 = 32 Bytes      = 0.000030517578125 MB
-//Total Memory for buckets_of_A: 1.062713623046875 MB
 //----------------------------------------------------------------------------------------------------
 
+//----------------------------------------------------------------------------------------------------
+// Total Memory for pointers of buckets of A = 17pointers x 8Bytes = 0.0001297MB
 void *buckets_of_A[17] = {buckets_of_A1, buckets_of_A2, buckets_of_A3, buckets_of_A4, buckets_of_A5, buckets_of_A6, buckets_of_A7, buckets_of_A8, buckets_of_A9, buckets_of_A10, buckets_of_A11, buckets_of_A12, buckets_of_A13, buckets_of_A14, buckets_of_A15, buckets_of_A16, buckets_of_A17};
-//Total memory for pointers of buckets of A = 17pointers x 8Bytes = 0.0001297MB 
+//----------------------------------------------------------------------------------------------------
 
 //----------------------------------------------------------------------------------------------------
+//Total Memory for buckets_of_B: 1.062713623046875 MB
 u_int8_t buckets_of_B1[BUCKETS]         = {0};      //524,288 * 1 = 524,288 Bytes = 0.5 MB
 u_int8_t buckets_of_B2[BUCKETS/2]       = {0};      //262,144 * 1 = 262,144 Bytes = 0.25 MB
 u_int8_t buckets_of_B3[BUCKETS/4]       = {0};      //131,072 * 1 = 131,072 Bytes = 0.125 MB
@@ -124,19 +134,26 @@ u_int32_t buckets_of_B14[BUCKETS/8192]  = {0};      //64      * 4 = 256 Bytes   
 u_int32_t buckets_of_B15[BUCKETS/16384] = {0};      //32      * 4 = 128 Bytes     = 0.0001220703125 MB
 u_int32_t buckets_of_B16[BUCKETS/32768] = {0};      //16      * 4 = 64 Bytes      = 0.00006103515625 MB
 u_int32_t buckets_of_B17[BUCKETS/65536] = {0};      //8       * 4 = 32 Bytes      = 0.000030517578125 MB
-//Total Memory for buckets_of_B: 1.062713623046875 MB
 //----------------------------------------------------------------------------------------------------
 
+//----------------------------------------------------------------------------------------------------
+// Total Memory for pointers of buckets of B = 17pointers x 8Bytes = 0.0001297MB
 void *buckets_of_B[17] = {buckets_of_B1, buckets_of_B2, buckets_of_B3, buckets_of_B4, buckets_of_B5, buckets_of_B6, buckets_of_B7, buckets_of_B8, buckets_of_B9, buckets_of_B10, buckets_of_B11, buckets_of_B12, buckets_of_B13, buckets_of_B14, buckets_of_B15, buckets_of_B16, buckets_of_B17};
-//Total memory for pointers of buckets of B = 17pointers x 8Bytes = 0.0001297MB 
+//----------------------------------------------------------------------------------------------------
 
+//----------------------------------------------------------------------------------------------------
+//Total Memory for variables: 4Bytes + 4Bytes + 4Bytes + 8Bytes + 4Bytes + 4Bytes = 24Bytes
 u_int32_t init_size = 0;
 u_int32_t curr_size = 0;
 double multiplier   = SAMPLING_CORRECTION;
 int max_value       = MAX_VALUE;
 int bin_size        = BIN_SIZE;
 int bucket_size     = BUCKET_SIZE;
-//Total Memory for data structure: 1,003 + 0.99 + 0.99 = 2.97 MB
+//----------------------------------------------------------------------------------------------------
+
+//----------------------------------------------------------------------------------------------------
+//Total Memory for data structure: CMS_AB + histogram + buckets_of_A + buckets_of_B + variables = 0.48828125 MB + 1.083251953MB + 1.062713623046875 MB + 1.062713623046875 MB + 0.0001297MB = 3.69709079909375 MB
+//----------------------------------------------------------------------------------------------------
 
 void CEEngine::insertTuple(const std::vector<int>& tuple) {
     u_int32_t A = tuple[0];
@@ -217,7 +234,7 @@ void CEEngine::deleteTuple(const std::vector<int>& tuple, int tupleId) {
 }
 
 int CEEngine::query(const std::vector<CompareExpression>& quals) {
-    CMS_AB.printTable();
+    //CMS_AB.printTable();
     if (quals.size() == 1) {
         // A = x OR B = x | // Time Complexity: O(1)
         if (quals[0].compareOp == EQUAL) {
@@ -244,11 +261,6 @@ int CEEngine::query(const std::vector<CompareExpression>& quals) {
 
             // A > x
             if (quals[0].columnIdx == 0) {
-
-                // for (i; i < BUCKETS; i++) {
-                //     total_count += buckets_of_A1[i];
-                // }
-
                 for(int i=0; i < 16; i++) {
                     if(index % 2 == 1){
                         if(i<3)
@@ -265,12 +277,6 @@ int CEEngine::query(const std::vector<CompareExpression>& quals) {
 
             // B > X
             } else {
-
-                // u_int32_t i = B/bucket_size+1 < BUCKETS ? B/bucket_size+1 : BUCKETS-1;
-                // for (i; i < BUCKETS; i++) {
-                //     total_count += buckets_of_B1[i];
-                // }
-                
                 for(int i=0; i < 16; i++) {
                     if(index % 2 == 1){
                         if(i<3)
@@ -297,24 +303,6 @@ int CEEngine::query(const std::vector<CompareExpression>& quals) {
 
         // A = x AND B = y
         if (quals[0].compareOp == EQUAL && quals[1].compareOp == EQUAL) {
-            // if (quals[0].columnIdx == 0) {
-            //     return bloomFilter.query(quals[0].value, quals[1].value);
-            // } else {
-            //     return bloomFilter.query(quals[1].value, quals[0].value);
-            // }
-
-            //Case 1: (A = x AND A = y) or (B = x AND B = y)
-            #ifdef DUPLICATE_COLUMNS
-            if(quals[0].columnIdx == quals[1].columnIdx) {
-                int x = quals[0].value;
-                int y = quals[1].value;
-                if(x == y)
-                    return quals[0].columnIdx == 0 ? (buckets_of_A1[x/bucket_size]/bucket_size)*SAMPLING_CORRECTION : (buckets_of_B1[y/bucket_size]/bucket_size)*SAMPLING_CORRECTION;
-                return 0;
-            }
-            #endif
-
-            //Case 2: (A = x AND B = y)
             //Proven best approximation, so far
             // return 0;
             int A,B;
@@ -331,28 +319,6 @@ int CEEngine::query(const std::vector<CompareExpression>& quals) {
 
         // A = x AND B > y
         if (quals[0].compareOp == EQUAL && quals[1].compareOp == GREATER) {
-            // int count;
-            // if (quals[0].columnIdx == 0) {
-            //     count = CMS_A.query(quals[0].value)*multiplier;
-            // } else {
-            //     count = CMS_B.query(quals[0].value)*multiplier;
-            // }
-            // return count*((double)(MAX_VALUE-quals[1].value)/MAX_VALUE);
-            //Proven best approximation, so far
-            //return (curr_size/MAX_VALUE)*(MAX_VALUE-quals[1].value)/MAX_VALUE;
-
-            //Case 1: (A = x AND A > y) or (B = x AND B > y)
-            #ifdef DUPLICATE_COLUMNS
-            if (quals[0].columnIdx == quals[1].columnIdx) {
-                int x = quals[0].value;
-                int y = quals[1].value;
-                if (y >= x)
-                    return 0;
-                return quals[0].columnIdx == 0 ? (buckets_of_A1[quals[0].value/bucket_size]/bucket_size)*SAMPLING_CORRECTION : (buckets_of_B1[quals[0].value/bucket_size]/bucket_size)*SAMPLING_CORRECTION;
-            }
-            #endif
-
-            //Case 2: (A = x AND B > y)
             int total_count = 0;
             //Equal
             double eqEstimation = quals[0].columnIdx == 0 ? ((double)(buckets_of_A1[quals[0].value/bucket_size])/bucket_size)*multiplier : ((double)(buckets_of_B1[quals[0].value/bucket_size])/bucket_size)*multiplier;
@@ -396,19 +362,6 @@ int CEEngine::query(const std::vector<CompareExpression>& quals) {
 
         // A > x AND B = y
         if (quals[0].compareOp == GREATER && quals[1].compareOp == EQUAL) {
-
-            //Case 1: (A > x AND A = y) or (B > x AND B = y)
-            #ifdef DUPLICATE_COLUMNS
-            if (quals[0].columnIdx == quals[1].columnIdx) {
-                int x = quals[0].value;
-                int y = quals[1].value;
-                if (y <= x)
-                    return 0;
-                return quals[1].columnIdx == 0 ? (buckets_of_A1[quals[1].value/bucket_size]/bucket_size)*SAMPLING_CORRECTION : (buckets_of_B1[quals[1].value/bucket_size]/bucket_size)*SAMPLING_CORRECTION;
-            }
-            #endif
-
-            //Case 2: (A > x AND B = y)
             int total_count = 0;
             //Equal
             double eqEstimation = quals[1].columnIdx == 0 ? ((double)(buckets_of_A1[quals[1].value/bucket_size])/bucket_size)*multiplier : ((double)(buckets_of_B1[quals[1].value/bucket_size])/bucket_size)*multiplier;
@@ -465,48 +418,6 @@ int CEEngine::query(const std::vector<CompareExpression>& quals) {
 
             u_int32_t total_count = 0;
             int index_a, index_b, size;
-
-            //Case 1: (A > x AND A > y) or (B > x AND B > y)
-            #ifdef DUPLICATE_COLUMNS
-            if(quals[0].columnIdx == quals[1].columnIdx) {
-
-                size = BUCKETS;
-                int value = quals[0].value < quals[1].value ? quals[0].value : quals[1].value;
-                int index = value/bucket_size+1 < size ? value/bucket_size+1 : size-1;
-
-                if(quals[0].columnIdx == 0){
-                    for(int i=0; i < 16; i++) {
-                        if(index % 2 == 1){
-                            if(i<3)
-                                total_count += ((u_int8_t*)buckets_of_A[i])[index++];
-                            else if(i<12)
-                                total_count += ((u_int16_t*)buckets_of_A[i])[index++];
-                            else
-                                total_count += ((u_int32_t*)buckets_of_A[i])[index++];
-                        }
-                        index /= 2;
-                    }
-                    for(int i = index;i<8;i++)
-                        total_count += ((u_int32_t*)buckets_of_A[16])[i];
-                }
-                else{
-                    for(int i=0; i < 16; i++) {
-                        if(index % 2 == 1){
-                            if(i<3)
-                                total_count += ((u_int8_t*)buckets_of_B[i])[index++];
-                            else if(i<12)
-                                total_count += ((u_int16_t*)buckets_of_B[i])[index++];
-                            else
-                                total_count += ((u_int32_t*)buckets_of_B[i])[index++];
-                        }
-                        index /= 2;
-                    }
-                    for(int i = index;i<8;i++)
-                        total_count += ((u_int32_t*)buckets_of_B[16])[i];
-                }
-                return total_count*multiplier;
-            }
-            #endif
 
             //Case 2: (A > x AND B > y)
 
