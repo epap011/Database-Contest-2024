@@ -25,14 +25,16 @@
 class CountMinSketch {
 private:
     static constexpr u_int32_t WIDTH = 4000; // Number of columns in the sketch
-    static constexpr u_int32_t DEPTH = 32;;  // Number of hash functions (rows)
-    u_int32_t table[DEPTH][WIDTH]    = {0};  // 2D table to store counts
-    std::array<std::function<size_t(u_int32_t, u_int32_t)>, DEPTH> hashFunctions;// Hash functions
-    bool singleKeyMode;
+    static constexpr u_int32_t DEPTH = 32;  // Number of hash functions (rows)
+    u_int32_t table[DEPTH][WIDTH] = {0};    // 2D table to store counts
+    std::array<std::function<size_t(u_int32_t, u_int32_t)>, DEPTH> hashFunctions; // Hash functions
+    bool singleKeyMode;                     // Flag to determine mode (single or dual key)
 
 public:
+    // Default constructor for dual-key mode
     CountMinSketch() : singleKeyMode(false) {
-        // Initialize hash functions (std::hash<string> acts as hash functions)
+        // Initialize hash functions for dual-key mode
+        std::cout << "Dual Key Mode" << std::endl;
         for (u_int32_t i = 0; i < DEPTH; ++i) {
             hashFunctions[i] = [seed = i](u_int32_t keyA, u_int32_t keyB) {
                 return std::hash<u_int32_t>()(keyA) ^ (std::hash<u_int32_t>()(keyB) + seed * 0x9e3779b9);
@@ -40,8 +42,10 @@ public:
         }
     }
 
+    // Constructor for single-key mode
     CountMinSketch(bool singleKey) : singleKeyMode(singleKey) {
-        // Initialize hash functions
+        // Initialize hash functions for single-key mode
+        std::cout << "Single Key Mode" << std::endl;
         for (u_int32_t i = 0; i < DEPTH; ++i) {
             hashFunctions[i] = [seed = i](u_int32_t key, u_int32_t) {
                 return std::hash<u_int32_t>()(key) + seed * 0x9e3779b9;
@@ -98,7 +102,7 @@ public:
     }
 
     // Print the sketch table
-    void printTable() {
+    void printTable() const {
         for (u_int32_t i = 0; i < DEPTH; ++i) {
             for (u_int32_t j = 0; j < 20; ++j) {
                 std::cout << table[i][j] << " ";
@@ -109,7 +113,7 @@ public:
     }
 };
 
-CountMinSketch CMS_AB(false);
+CountMinSketch CMS_AB;
 int cms_noise = 0;
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -121,8 +125,8 @@ u_int32_t histogram128[BINS/4][BINS/4]   = {0};     // 128 * 128 * 4 = 16384 Byt
 u_int32_t histogram64[BINS/8][BINS/8]    = {0};     // 64  * 64  * 4 = 4096 Bytes  = 0.00390625 MB
 u_int32_t histogram32[BINS/16][BINS/16]  = {0};     // 32  * 32  * 4 = 1024 Bytes  = 0.0009765625 MB
 u_int32_t histogram16[BINS/32][BINS/32]  = {0};     // 16  * 16  * 4 = 256 Bytes   = 0.000244140625 MB
-u_int32_t histogram8[BINS/64][BINS/64]   = {0};     //
-u_int32_t histogram4[BINS/128][BINS/128] = {0};     // 
+u_int32_t histogram8[BINS/64][BINS/64]   = {0};     // 8   * 8   * 4 = 128 Bytes   = 0.0001220703125 MB
+u_int32_t histogram4[BINS/128][BINS/128] = {0};     // 4   * 4   * 4 = 64 Bytes    = 0.00006103515625 MB
 //----------------------------------------------------------------------------------------------------
 
 //----------------------------------------------------------------------------------------------------
