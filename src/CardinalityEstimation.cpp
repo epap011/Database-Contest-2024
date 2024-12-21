@@ -19,41 +19,51 @@
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 class CountMinSketch {// Example memory per CMS = 10,000(WIDTH) * 32(DEPTH) * 4(BYTES)=1,280,000bytes (1.28 MB per CMS).
 private:
-    int width; // Number of columns in the sketch
-    int depth; // Number of hash functions (rows)
-    std::vector<std::vector<int>> table; // 2D table to store counts
-    std::vector<std::hash<std::string>> hashFunctions; // Hash functions
+    static constexpr u_int32_t WIDTH = 4000; // Number of columns in the sketch
+    static constexpr u_int32_t DEPTH = 32;;  // Number of hash functions (rows)
+    u_int32_t table[DEPTH][WIDTH]    = {0};  // 2D table to store counts
+    std::array<std::function<size_t(u_int32_t, u_int32_t)>, DEPTH> hashFunctions;// Hash functions
 
 public:
-    CountMinSketch(int width, int depth) : width(width), depth(depth), table(depth, std::vector<int>(width, 0)) {
+    CountMinSketch() {
         // Initialize hash functions (std::hash<string> acts as hash functions)
-        for (int i = 0; i < depth; ++i) {
-            hashFunctions.emplace_back(std::hash<std::string>());
+        for (u_int32_t i = 0; i < DEPTH; ++i) {
+            hashFunctions[i] = [seed = i](u_int32_t keyA, u_int32_t keyB) {
+                return std::hash<u_int32_t>()(keyA) ^ (std::hash<u_int32_t>()(keyB) + seed * 0x9e3779b9);
+            };
         }
     }
 
     // Insert an item into the sketch
-    void insert(int keyA, int keyB) {
-        std::string keyStr = std::to_string(keyA) + ":" + std::to_string(keyB);
-        for (int i = 0; i < depth; ++i) {
-            size_t hashVal = hashFunctions[i](keyStr);
-            table[i][hashVal % width] += 1;
+    void insert(u_int32_t keyA, u_int32_t keyB) {
+        for (u_int32_t i = 0; i < DEPTH; ++i) {
+            size_t hashVal = hashFunctions[i](keyA, keyB);
+            table[i][hashVal % WIDTH] += 1;
         }
     }
 
     // Query the approximate count of a key
-    int query(int keyA, int keyB) const {
-        std::string keyStr = std::to_string(keyA) + ":" + std::to_string(keyB);
-        int minCount = INT_MAX; // Start with a large value
-        for (int i = 0; i < depth; ++i) {
-            size_t hashVal = hashFunctions[i](keyStr);
-            minCount = std::min(minCount, table[i][hashVal % width]);
+    u_int32_t query(u_int32_t keyA, u_int32_t keyB) const {
+        u_int32_t minCount = std::numeric_limits<u_int32_t>::max();
+        for (u_int32_t i = 0; i < DEPTH; ++i) {
+            size_t hashVal = hashFunctions[i](keyA, keyB);
+            minCount = std::min(minCount, table[i][hashVal % WIDTH]);
         }
         return minCount;
     }
+
+    void printTable() {
+        for (u_int32_t i = 0; i < DEPTH; ++i) {
+            for (u_int32_t j = 0; j < 20; ++j) {
+                std::cout << table[i][j] << " ";
+            }
+            std::cout << std::endl;
+        }
+        std::cout << std::endl << std::endl;
+    }
 };
 
-CountMinSketch CMS_AB(4000, 32); // 4000 * 32 * 4 = 512000 Bytes = 0.5 MB
+CountMinSketch CMS_AB;
 int cms_noise = 0;
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
@@ -207,6 +217,7 @@ void CEEngine::deleteTuple(const std::vector<int>& tuple, int tupleId) {
 }
 
 int CEEngine::query(const std::vector<CompareExpression>& quals) {
+    CMS_AB.printTable();
     if (quals.size() == 1) {
         // A = x OR B = x | // Time Complexity: O(1)
         if (quals[0].compareOp == EQUAL) {
@@ -598,7 +609,7 @@ CEEngine::CEEngine(int num, DataExecuter *dataExecuter) {
     //std::cout << "Max Value: " << max_value << std::endl;
 
     //Adjust bin and bucket sizes dynamically, based on max value
-    bin_size = max_value/BINS;
+    bin_size    = max_value/BINS;
     bucket_size = max_value/BUCKETS;
 
     for (int i = 0; i < num; i+=OFFSET) {
