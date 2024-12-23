@@ -7,12 +7,14 @@
 
 //DEBUG
 int check = 0;
+int s_check = 0;
 
 std::unordered_map<int, bool> vis;
 DataExecuterDemo::DataExecuterDemo(int end, int count) : DataExecuter()
 {
     this->end = end;
     this->count = count;
+    //Generate first 9mil manually (9000 values 1000 times each)
     for (int i = 0; i < 9000; ++i) {
         for(int j = 0; j < 1000; j++){
             std::vector<int> tuple;
@@ -86,6 +88,17 @@ Action DataExecuterDemo::getNextAction()
             action.quals.push_back(expr2);
         }
     }
+    else if (count>19925){
+        action.actionType = QUERY;
+        CompareOp op1 = rand() % 2 ? EQUAL : GREATER;
+        CompareOp op2 = op1 == EQUAL ? GREATER : EQUAL;
+        int column = rand() % 2;
+        CompareExpression expr = {column, op1, (op1 == EQUAL) ? s_check : rand() % MAX_VALUE + 1};
+        action.quals.push_back(expr);
+        CompareExpression expr2 = {column ? 0 : 1, op2, (op2 == EQUAL) ? s_check : rand() % MAX_VALUE + 1};
+        action.quals.push_back(expr2);
+        s_check+=100;
+    }
     else if (count % 100 == 99) {
         action.actionType = QUERY;
         CompareExpression expr = {rand() % 2, CompareOp(rand() % 2), rand() % MAX_VALUE + 1};
@@ -132,7 +145,12 @@ double DataExecuterDemo::answer(int ans)
             cnt++;
     }
     double error = fabs(std::log((ans + 1) * 1.0 / (cnt + 1)));
-    if (curAction.quals.size() == 2 && curAction.quals[0].compareOp == EQUAL && curAction.quals[1].compareOp == EQUAL)
-        std::cout << cnt << std::endl;
+    // DEBUG PRINTS (also in main.cpp)
+    // if (curAction.quals.size() == 2 && curAction.quals[0].compareOp == EQUAL && curAction.quals[1].compareOp == EQUAL)
+    //     std::cout << cnt << std::endl;
+    // else if (curAction.quals.size() == 2 && ((curAction.quals[0].compareOp == EQUAL && curAction.quals[1].compareOp == GREATER) || (curAction.quals[0].compareOp == GREATER && curAction.quals[1].compareOp == EQUAL)))
+    //     std::cout << cnt << std::endl;
+    // else if (curAction.quals.size()==1 && curAction.quals[0].compareOp == EQUAL)
+    //     std::cout << cnt << std::endl;
     return error;
 };

@@ -3,17 +3,17 @@
 
 int main(int argc, char *argv[])
 {
-    int initSize = 40000000; // Initial data size.
-    int opSize = 20000;    // Number of operations.
-    double SingleEqualScore = 0;
+    int initSize = 10000000; // Initial data size.
+    int opSize   = 10000;    // Number of operations.
+    double SingleEqualScore   = 0;
     double SingleGreaterScore = 0;
-    double DoubleEqualScore = 0;
+    double DoubleEqualScore   = 0;
     double DoubleGreaterScore = 0;
     double DoubleGreaterEqualScore = 0;
     double score = 0;
-    int SingleEqualCnt = 0;
+    int SingleEqualCnt   = 0;
     int SingleGreaterCnt = 0;
-    int DoubleEqualCnt = 0;
+    int DoubleEqualCnt   = 0;
     int DoubleGreaterCnt = 0;
     int DoubleGreaterEqualCnt = 0;
     int cnt = 0;
@@ -43,8 +43,13 @@ int main(int argc, char *argv[])
            ceEngine.deleteTuple(action.actionTuple, action.tupleId);
         } else if (action.actionType == QUERY) {
             int ans = ceEngine.query(action.quals);
-            if (action.quals.size() == 2 && action.quals[0].compareOp == EQUAL && action.quals[1].compareOp == EQUAL)
-                std::cout<< "A=x AND B=y: estimate->" << ans << " real->";
+            //DEBUG PRINTS (also in DataExecuterDemo.cpp) (std::endl omitted on purpose)
+            // if (action.quals.size() == 2 && action.quals[0].compareOp == EQUAL && action.quals[1].compareOp == EQUAL)
+            //     std::cout<< "A=x AND B=y: estimate->" << ans << " real->";
+            // else if (action.quals.size() == 2 && ((action.quals[0].compareOp == EQUAL && action.quals[1].compareOp == GREATER) || (action.quals[0].compareOp == GREATER && action.quals[1].compareOp == EQUAL)))
+            //     std::cout<< "A=x AND B>y: estimate->" << ans << " real->";
+            // else if (action.quals.size()==1 && action.quals[0].compareOp == EQUAL)
+            //     std::cout<<"{A,B}=x: estimate->" << ans << " real->";
             double realAns = dataExecuter.answer(ans);
             score += realAns;
             cnt++;

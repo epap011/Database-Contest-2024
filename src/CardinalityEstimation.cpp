@@ -8,13 +8,13 @@
 
 #define MEM_LIMIT_BYTES 4194304
 #define MAX_VALUE 20000000
-#define BUCKETS 262144 //524288
+#define BUCKETS 262144
 #define BUCKET_SIZE (MAX_VALUE/BUCKETS)
 #define BUCKET_LAYERS 16
 #define BINS 512
 #define BIN_SIZE (MAX_VALUE/BINS)
 #define OFFSET 250000
-#define SAMPLING_RATE 0.02
+#define SAMPLING_RATE 0.05
 #define SAMPLING_CORRECTION (1/SAMPLING_RATE)
 
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
@@ -118,7 +118,9 @@ public:
 CountMinSketchAB CMS_AB;
 CountMinSketch CMS_A;
 CountMinSketch CMS_B;
-int cms_noise = 0;
+int cmsAB_noise = 0;
+int cmsA_noise = 0;
+int cmsB_noise = 0;
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 //----------------------------------------------------------------------------------------------------
@@ -129,8 +131,8 @@ u_int32_t histogram128[BINS/4][BINS/4]   = {0};     // 128 * 128 * 4 = 16384 Byt
 u_int32_t histogram64[BINS/8][BINS/8]    = {0};     // 64  * 64  * 4 = 4096 Bytes  = 0.00390625 MB
 u_int32_t histogram32[BINS/16][BINS/16]  = {0};     // 32  * 32  * 4 = 1024 Bytes  = 0.0009765625 MB
 u_int32_t histogram16[BINS/32][BINS/32]  = {0};     // 16  * 16  * 4 = 256 Bytes   = 0.000244140625 MB
-u_int32_t histogram8[BINS/64][BINS/64]   = {0};     //
-u_int32_t histogram4[BINS/128][BINS/128] = {0};     // 
+u_int32_t histogram8[BINS/64][BINS/64]   = {0};     // 8   * 8   * 4 = 128 Bytes   = 0.0001220703125 MB
+u_int32_t histogram4[BINS/128][BINS/128] = {0};     // 4  * 4   * 4 = 64 Bytes    = 0.00006103515625 MB
 //----------------------------------------------------------------------------------------------------
 
 //----------------------------------------------------------------------------------------------------
@@ -289,12 +291,17 @@ int CEEngine::query(const std::vector<CompareExpression>& quals) {
     if (quals.size() == 1) {
         // A = x OR B = x | // Time Complexity: O(1)
         if (quals[0].compareOp == EQUAL) {
-            //Probabilistic (proven best on tests)
-            //int estimation = quals[0].columnIdx == 0 ? ((double)(buckets_of_A1[quals[0].value/bucket_size])/bucket_size)*multiplier : ((double)(buckets_of_B1[quals[0].value/bucket_size])/bucket_size)*multiplier;
-            //return estimation;
+            //CMS/Histogram hybrid
+            int estimation = (quals[0].columnIdx == 0) ? CMS_A.query(quals[0].value) : CMS_B.query(quals[0].value);
+            estimation -= (quals[0].columnIdx == 0 ? cmsA_noise : cmsB_noise);
+            //Histogram fallback
+            if (estimation < 0){
+                estimation = quals[0].columnIdx == 0 ? ((double)(buckets_of_A1[quals[0].value/bucket_size])/bucket_size)*multiplier : ((double)(buckets_of_B1[quals[0].value/bucket_size])/bucket_size)*multiplier;
+            }
+            return estimation;
             //return 0;
 
-            return quals[0].columnIdx == 0 ? CMS_A.query(quals[0].value) : CMS_B.query(quals[0].value);
+            // return quals[0].columnIdx == 0 ? CMS_A.query(quals[0].value) : CMS_B.query(quals[0].value);
         }
 
         // A > x OR B > x | // Time Complexity: O(|Buckets|)
@@ -359,14 +366,19 @@ int CEEngine::query(const std::vector<CompareExpression>& quals) {
                 B=quals[0].value;
             }
             int cms_count = CMS_AB.query(A,B);
-            return (cms_count > cms_noise*2) ? cms_count -= cms_noise : cms_count = 0;
+            return (cms_count - cmsAB_noise) >= 0 ? cms_count - cmsAB_noise : 0;
         }
 
         // A = x AND B > y
         if (quals[0].compareOp == EQUAL && quals[1].compareOp == GREATER) {
             int total_count = 0;
             //Equal
-            double eqEstimation = quals[0].columnIdx == 0 ? ((double)(buckets_of_A1[quals[0].value/bucket_size])/bucket_size)*multiplier : ((double)(buckets_of_B1[quals[0].value/bucket_size])/bucket_size)*multiplier;
+            // double eqEstimation = quals[0].columnIdx == 0 ? ((double)(buckets_of_A1[quals[0].value/bucket_size])/bucket_size)*multiplier : ((double)(buckets_of_B1[quals[0].value/bucket_size])/bucket_size)*multiplier;
+            //CMS based
+            double eqEstimation = quals[0].columnIdx == 0 ? CMS_A.query(quals[0].value) : CMS_B.query(quals[0].value);
+            eqEstimation -= (quals[0].columnIdx == 0) ? cmsA_noise : cmsB_noise;
+            //probabilistic fallback
+            if (eqEstimation < 0) return curr_size/max_value;
             //Greater
             int size = BUCKETS;
             int value = quals[1].value;
@@ -402,6 +414,7 @@ int CEEngine::query(const std::vector<CompareExpression>& quals) {
             }
 
             //Return the estimation for the first column multiplied by the ratio of the second column
+            //CMS / Histogram / Probabilistic tribrid
             return eqEstimation * ((double)(total_count*multiplier)/curr_size);
         }
 
@@ -409,13 +422,18 @@ int CEEngine::query(const std::vector<CompareExpression>& quals) {
         if (quals[0].compareOp == GREATER && quals[1].compareOp == EQUAL) {
             int total_count = 0;
             //Equal
-            double eqEstimation = quals[1].columnIdx == 0 ? ((double)(buckets_of_A1[quals[1].value/bucket_size])/bucket_size)*multiplier : ((double)(buckets_of_B1[quals[1].value/bucket_size])/bucket_size)*multiplier;
+            //double eqEstimation = quals[1].columnIdx == 0 ? ((double)(buckets_of_A1[quals[1].value/bucket_size])/bucket_size)*multiplier : ((double)(buckets_of_B1[quals[1].value/bucket_size])/bucket_size)*multiplier;
+            //CMS based
+            double eqEstimation = quals[1].columnIdx == 0 ? CMS_A.query(quals[1].value) : CMS_B.query(quals[1].value);
+            eqEstimation -= (quals[1].columnIdx == 0) ? cmsA_noise : cmsB_noise;
+            //probabilistic fallback
+            if (eqEstimation < 0) return curr_size/max_value;
             //Greater
             int size = BUCKETS;
             int value = quals[0].value;
             int index = value/bucket_size+1 < size ? value/bucket_size+1 : size-1;
             if (quals[0].columnIdx == 0) {
-                for(int i=0; i < 16; i++) {
+                for(int i=0; i < BUCKET_LAYERS; i++) {
                     if(index % 2 == 1){
                         if(i<3)
                             total_count += ((u_int8_t*)buckets_of_A[i])[index++];
@@ -445,6 +463,7 @@ int CEEngine::query(const std::vector<CompareExpression>& quals) {
             }
 
             //Return the estimation for the first column multiplied by the ratio of the second column
+            //CMS / Histogram / Probabilistic tribrid
             return eqEstimation * ((double)(total_count*multiplier)/curr_size);
         }
 
@@ -577,6 +596,8 @@ CEEngine::CEEngine(int num, DataExecuter *dataExecuter) {
             B = data[j][1];
 
             CMS_AB.insert(A,B);
+            CMS_A.insert(A);    //boba is life in the summer
+            CMS_B.insert(B);    //perfect bubble tea is a must have in the summer time
 
             int index_a, index_b, size;
 
@@ -609,4 +630,13 @@ CEEngine::CEEngine(int num, DataExecuter *dataExecuter) {
         }
     }    
     data.clear();
+    int cms_step = MAX_VALUE/200;
+    for (int i=0;i<200;i++){
+        cmsAB_noise += CMS_AB.query(i*cms_step,(i+1)*cms_step);
+        cmsA_noise += CMS_A.query(i*cms_step);
+        cmsB_noise += CMS_B.query(i*cms_step);
+    }
+    cmsAB_noise /= 200;
+    cmsA_noise /= 200;
+    cmsB_noise /= 200;
 }
