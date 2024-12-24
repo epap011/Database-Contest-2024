@@ -17,7 +17,7 @@
 #define SUB_QUERIES 1000
 
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
-// Memory for table = 4,000(WIDTH) * 32(DEPTH) * 4(BYTES)= 512,000 Bytes = 0.48828125 MB
+// Memory for table = 4,000(WIDTH) * 32(DEPTH) * 4(BYTES) = 512,000 Bytes = 0.48828125 MB
 // Memory for hash functions = 32(DEPTH) * 8(BYTES) = 256 Bytes = 0.000244141MB
 // Total Memory for CountMinSketch: 0.488525391MB
 class CountMinSketchAB {
@@ -66,10 +66,15 @@ public:
         std::cout << std::endl << std::endl;
     }
 };
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+// Memory for table = 8,000(WIDTH) * 32(DEPTH) * 4(BYTES) = 1,024,000 Bytes = 0.9765625 MB
+// Memory for hash functions = 32(DEPTH) * 8(BYTES) = 256 Bytes = 0.000244141MB
+// Total Memory for CountMinSketch: 0.976806641MB
 class CountMinSketch {
 private:
-    static constexpr u_int32_t WIDTH = 4000; // Number of columns in the sketch
+    static constexpr u_int32_t WIDTH = 8000; // Number of columns in the sketch
     static constexpr u_int32_t DEPTH = 32;;  // Number of hash functions (rows)
     u_int32_t table[DEPTH][WIDTH]    = {0};  // 2D table to store counts
     std::array<std::function<size_t(u_int32_t, u_int32_t)>, DEPTH> hashFunctions;// Hash functions
@@ -113,16 +118,6 @@ public:
         std::cout << std::endl << std::endl;
     }
 };
-
-int max_value_A = 0;
-int max_value_B = 0;
-
-CountMinSketchAB CMS_AB;
-CountMinSketch CMS_A;
-CountMinSketch CMS_B;
-int cmsAB_noise = 0;
-int cmsA_noise = 0;
-int cmsB_noise = 0;
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 //----------------------------------------------------------------------------------------------------
@@ -178,13 +173,28 @@ void *buckets_of_B[BUCKET_LAYERS] = {buckets_of_B1, buckets_of_B2, buckets_of_B3
 //----------------------------------------------------------------------------------------------------
 
 //----------------------------------------------------------------------------------------------------
-//Total Memory for variables: 4Bytes + 4Bytes + 4Bytes + 8Bytes + 4Bytes + 4Bytes = 24Bytes
-u_int32_t init_size = 0;
-u_int32_t curr_size = 0;
-double multiplier   = SAMPLING_CORRECTION;
-int max_value       = MAX_VALUE;
-int bucket_size     = BUCKET_SIZE;
+//Total Memory for variables: 68Bytes = 0.00006485MB
+CountMinSketchAB CMS_AB;   // 8Bytes
+CountMinSketch CMS_A;      // 8Bytes
+CountMinSketch CMS_B;      // 8Bytes
+u_int32_t cmsAB_noise = 0; // 4Bytes
+u_int32_t cmsA_noise  = 0; // 4Bytes
+u_int32_t cmsB_noise  = 0; // 4Bytes
+u_int32_t max_value_A = 0; // 4Bytes
+u_int32_t max_value_B = 0; // 4Bytes
+u_int32_t init_size   = 0; // 4Bytes
+u_int32_t curr_size   = 0;  // 4Bytes
+u_int32_t max_value   = MAX_VALUE;   // 4Bytes
+u_int32_t bucket_size = BUCKET_SIZE; // 4Bytes
+double multiplier     = SAMPLING_CORRECTION; // 8Bytes
 //----------------------------------------------------------------------------------------------------
+
+//+++++++++++++++++++++++T O T A L   M E M O R Y++++++++++++++++++++++++++++++++++++++++
+//Total Memory for data structure: 
+// CMS_AB        + CMS_A         + CMS_B         + buckets_of_A   + buckets_of_B   + variables 
+// 0.48828125 MB + 0.976806641MB + 0.976806641MB + 0.625457764 MB + 0.625457764 MB + 0.0001297MB = 3.69293976MB
+//++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
+
 
 //----------------------------------------------------------------------------------------------------
 //Total Memory for data structure: CMS_AB + histogram + buckets_of_A + buckets_of_B + variables = 0.48828125 MB + 1.083251953MB + 1.062713623046875 MB + 1.062713623046875 MB + 0.0001297MB = 3.69709079909375 MB
@@ -514,6 +524,11 @@ CEEngine::CEEngine(int num, DataExecuter *dataExecuter) {
 
     //Adjust bucket sizes dynamically, based on max value
     bucket_size = max_value/BUCKETS;
+
+    //size of data = a vector with OFFSET*SAMPLING_RATE vectors
+    //each vector has 2 elements (A,B) and the size of each element is 4 bytes
+
+    std::cout << "Vector size: " << sizeof(std::vector<int>) << std::endl;
 
     for (int i = 0; i < num; i+=OFFSET) {
         data.clear();
