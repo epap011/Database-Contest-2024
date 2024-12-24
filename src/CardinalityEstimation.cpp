@@ -13,9 +13,10 @@
 #define BUCKET_LAYERS 16
 #define BINS 512
 #define BIN_SIZE (MAX_VALUE/BINS)
-#define OFFSET 250000
-#define SAMPLING_RATE 0.05
+#define OFFSET 125000
+#define SAMPLING_RATE 0.1
 #define SAMPLING_CORRECTION (1/SAMPLING_RATE)
+#define SUB_QUERIES 1000
 
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 // Memory for table = 4,000(WIDTH) * 32(DEPTH) * 4(BYTES)= 512,000 Bytes = 0.48828125 MB
@@ -115,6 +116,9 @@ public:
     }
 };
 
+int max_value_A = 0;
+int max_value_B = 0;
+
 CountMinSketchAB CMS_AB;
 CountMinSketch CMS_A;
 CountMinSketch CMS_B;
@@ -132,7 +136,7 @@ u_int32_t histogram64[BINS/8][BINS/8]    = {0};     // 64  * 64  * 4 = 4096 Byte
 u_int32_t histogram32[BINS/16][BINS/16]  = {0};     // 32  * 32  * 4 = 1024 Bytes  = 0.0009765625 MB
 u_int32_t histogram16[BINS/32][BINS/32]  = {0};     // 16  * 16  * 4 = 256 Bytes   = 0.000244140625 MB
 u_int32_t histogram8[BINS/64][BINS/64]   = {0};     // 8   * 8   * 4 = 128 Bytes   = 0.0001220703125 MB
-u_int32_t histogram4[BINS/128][BINS/128] = {0};     // 4  * 4   * 4 = 64 Bytes    = 0.00006103515625 MB
+u_int32_t histogram4[BINS/128][BINS/128] = {0};     // 4   * 4   * 4 = 64 Bytes    = 0.00006103515625 MB
 //----------------------------------------------------------------------------------------------------
 
 //----------------------------------------------------------------------------------------------------
@@ -416,6 +420,34 @@ int CEEngine::query(const std::vector<CompareExpression>& quals) {
             //Return the estimation for the first column multiplied by the ratio of the second column
             //CMS / Histogram / Probabilistic tribrid
             return eqEstimation * ((double)(total_count*multiplier)/curr_size);
+
+            //+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
+            //+       Breaking query into multiple queries   +
+            //+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
+            // u_int32_t A,B, total_cms_count = 0;
+            // A=quals[0].value;
+            // B=quals[1].value;
+            // double multiplier = 1;
+
+            // if (max_value_B - B <= SUB_QUERIES) {
+            //     for (int i = B + 1; i <= max_value_B; ++i) {
+            //         total_cms_count += (CMS_AB.query(A,i) - cmsAB_noise);
+            //     }
+            // }
+            // else {
+            //     // Compute step size for SUB_QUERIES queries
+            //     double step = static_cast<double>(max_value_B - (B + 1)) / SUB_QUERIES-1;
+            //     multiplier = step;
+
+            //     // Generate SUB_QUERIES Bs with equal spacing
+            //     for (int i = 0; i < SUB_QUERIES; ++i) {
+            //         int num = static_cast<int>(B + 1 + i * step);
+            //         total_cms_count += (CMS_AB.query(A,num) - cmsAB_noise);
+            //     }
+            // }
+            // return total_cms_count;
+            //+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
+            //+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
         }
 
         // A > x AND B = y
@@ -465,6 +497,34 @@ int CEEngine::query(const std::vector<CompareExpression>& quals) {
             //Return the estimation for the first column multiplied by the ratio of the second column
             //CMS / Histogram / Probabilistic tribrid
             return eqEstimation * ((double)(total_count*multiplier)/curr_size);
+
+            //+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
+            //+       Breaking query into multiple queries   +
+            //+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
+            // u_int32_t A,B, total_cms_count = 0;
+            // A=quals[0].value;
+            // B=quals[1].value;
+            // double multiplier = 1;
+
+            // if (max_value_A - A <= SUB_QUERIES) {
+            //     for (int i = A + 1; i <= max_value_A; ++i) {
+            //         total_cms_count += (CMS_AB.query(i,B) - cmsAB_noise);
+            //     }
+            // }
+            // else {
+            //     // Compute step size for SUB_QUERIES queries
+            //     double step = static_cast<double>(max_value_A - (A + 1)) / SUB_QUERIES-1;
+            //     multiplier = step;
+
+            //     // Generate SUB_QUERIES Bs with equal spacing
+            //     for (int i = 0; i < SUB_QUERIES; ++i) {
+            //         int num = static_cast<int>(A + 1 + i * step);
+            //         total_cms_count += (CMS_AB.query(num,B) - cmsAB_noise);
+            //     }
+            // }
+            // return total_cms_count;
+            //+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
+            //+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-+-
         }
 
         // A > x AND B > y
@@ -564,25 +624,6 @@ CEEngine::CEEngine(int num, DataExecuter *dataExecuter) {
     std::vector<std::vector<int>> data;
     u_int32_t A,B;
 
-    // Sample table for max value, to assign appropriate bin and bucket sizes
-
-    // max_value = 0;
-    // for (int k = 0; k < 4; k++) {
-    //     data.clear();
-    //     dataExecuter->readTuples(k*(num/4), 5000, data);
-    //     for (int i = 0; i < 5000; i++) {
-    //         A = data[i][0];
-    //         B = data[i][1];
-    //         if(A > max_value) max_value = A;
-    //         if(B > max_value) max_value = B;
-    //     }
-    // }
-    // data.clear();
-
-    // Round up max value to the nearest 100,000 (seems not necessary)
-    //max_value = ((max_value + 99999) / 100000) * 100000;
-    //std::cout << "Max Value: " << max_value << std::endl;
-
     //Adjust bin and bucket sizes dynamically, based on max value
     bin_size    = max_value/BINS;
     bucket_size = max_value/BUCKETS;
@@ -595,9 +636,12 @@ CEEngine::CEEngine(int num, DataExecuter *dataExecuter) {
             A = data[j][0];
             B = data[j][1];
 
+            if (A > max_value_A) max_value_A = A;
+            if (B > max_value_B) max_value_B = B;
+
             CMS_AB.insert(A,B);
-            CMS_A.insert(A);    //boba is life in the summer
-            CMS_B.insert(B);    //perfect bubble tea is a must have in the summer time
+            CMS_A.insert(A);
+            CMS_B.insert(B);
 
             int index_a, index_b, size;
 
