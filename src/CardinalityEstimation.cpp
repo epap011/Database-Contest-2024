@@ -11,8 +11,6 @@
 #define BUCKETS 262144
 #define BUCKET_SIZE (MAX_VALUE/BUCKETS)
 #define BUCKET_LAYERS 16
-#define BINS 512
-#define BIN_SIZE (MAX_VALUE/BINS)
 #define OFFSET 125000
 #define SAMPLING_RATE 0.1
 #define SAMPLING_CORRECTION (1/SAMPLING_RATE)
@@ -128,23 +126,6 @@ int cmsB_noise = 0;
 //++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++++
 
 //----------------------------------------------------------------------------------------------------
-//Total Memory for histograms: 1.083251953MB
-u_int32_t histogram512[BINS][BINS]       = {0};     // 512 * 512 * 4 = 1048576 Bytes = 1 MB
-u_int32_t histogram256[BINS/2][BINS/2]   = {0};     // 256 * 256 * 4 = 65536 Bytes = 0.0625 MB
-u_int32_t histogram128[BINS/4][BINS/4]   = {0};     // 128 * 128 * 4 = 16384 Bytes = 0.015625 MB
-u_int32_t histogram64[BINS/8][BINS/8]    = {0};     // 64  * 64  * 4 = 4096 Bytes  = 0.00390625 MB
-u_int32_t histogram32[BINS/16][BINS/16]  = {0};     // 32  * 32  * 4 = 1024 Bytes  = 0.0009765625 MB
-u_int32_t histogram16[BINS/32][BINS/32]  = {0};     // 16  * 16  * 4 = 256 Bytes   = 0.000244140625 MB
-u_int32_t histogram8[BINS/64][BINS/64]   = {0};     // 8   * 8   * 4 = 128 Bytes   = 0.0001220703125 MB
-u_int32_t histogram4[BINS/128][BINS/128] = {0};     // 4   * 4   * 4 = 64 Bytes    = 0.00006103515625 MB
-//----------------------------------------------------------------------------------------------------
-
-//----------------------------------------------------------------------------------------------------
-//Total Memory for pointers of histograms: 8pointers x 8Bytes = 0.000061035MB
-void* histogram[8] = {histogram512, histogram256, histogram128, histogram64, histogram32, histogram16, histogram8, histogram4};
-//----------------------------------------------------------------------------------------------------
-
-//----------------------------------------------------------------------------------------------------
 //Total Memory for buckets_of_A: 0.625457764 MB
 u_int8_t buckets_of_A1[BUCKETS]         = {0};      // 262,144 * 1 = 262,144 Bytes = 0.25 MB
 u_int8_t buckets_of_A2[BUCKETS/2]       = {0};      // 131,072 * 1 = 131,072 Bytes = 0.125 MB
@@ -202,7 +183,6 @@ u_int32_t init_size = 0;
 u_int32_t curr_size = 0;
 double multiplier   = SAMPLING_CORRECTION;
 int max_value       = MAX_VALUE;
-int bin_size        = BIN_SIZE;
 int bucket_size     = BUCKET_SIZE;
 //----------------------------------------------------------------------------------------------------
 
@@ -219,14 +199,6 @@ void CEEngine::insertTuple(const std::vector<int>& tuple) {
     CMS_B.insert(B);
 
     int index_a, index_b, size;
-    
-    size = BINS;
-    for(int i = 0; i < 8; i++) {
-        index_a = A/(max_value/size) < size ? A/(max_value/size) : size-1;
-        index_b = B/(max_value/size) < size ? B/(max_value/size) : size-1;
-        ((u_int32_t(*)[size])histogram[i])[index_a][index_b]++;
-        size /= 2;
-    }
 
     size = BUCKETS;
     for (int i = 0; i < BUCKET_LAYERS; i++) {
@@ -256,14 +228,6 @@ void CEEngine::deleteTuple(const std::vector<int>& tuple, int tupleId) {
     u_int32_t B = tuple[1];
 
     int index_a, index_b, size;
-    size = BINS;
-    for(int i = 0; i < 8; i++) {
-        index_a = A/(max_value/size) < size ? A/(max_value/size) : size-1;
-        index_b = B/(max_value/size) < size ? B/(max_value/size) : size-1;
-        if(((u_int32_t(*)[size])histogram[i])[index_a][index_b])
-            ((u_int32_t(*)[size])histogram[i])[index_a][index_b]--;
-        size /= 2;
-    }
 
     size = BUCKETS;
     for (int i = 0; i < BUCKET_LAYERS; i++){
@@ -529,84 +493,8 @@ int CEEngine::query(const std::vector<CompareExpression>& quals) {
 
         // A > x AND B > y
         if (quals[0].compareOp == GREATER && quals[1].compareOp == GREATER) {
-            u_int32_t A;
-            u_int32_t B;
-
-            if(quals[0].columnIdx == 0) {
-                A = quals[0].value;
-                B = quals[1].value;
-            } else {
-                A = quals[1].value;
-                B = quals[0].value;
-            }
-
-            u_int32_t total_count = 0;
-            int index_a, index_b, size;
-
-            //Case 2: (A > x AND B > y)
-
-            //Logarithmic search in histograms
-            size = BINS;
-            
-            //Estimation for first row/column
-            // index_a = A/bin_size < BINS ? A/bin_size : BINS-1;
-            // index_b = B/bin_size < BINS ? B/bin_size : BINS-1;
-            // for (int i=index_b; i<size; i++) {
-            //     total_count += ((u_int32_t(*)[size])histogram[0])[index_a][i] / 2;
-            // }
-            // for (int i=index_a; i<size; i++) {
-            //     total_count += ((u_int32_t(*)[size])histogram[0])[i][index_b] / 2;
-            // }
-
-            // total_count -= ((u_int32_t(*)[size])histogram[0])[index_a][index_b] / 2;
-
-            // //Invalidate further calculations if the search is already at the last row/column
-            // if(index_a != BINS-1 && index_b != BINS-1) {
-            //     index_a = A/bin_size+1 < size ? A/bin_size+1  : size-1;
-            //     index_b = B/bin_size+1 < size ? B/bin_size+1  : size-1;
-            // }
-            // else{
-            //     index_a = size;
-            //     index_b = size;
-            // }
-
-            index_a = A/bin_size+1 < size ? A/bin_size+1  : size-1;
-            index_b = B/bin_size+1 < size ? B/bin_size+1  : size-1;
-
-            bool flag_a, flag_b;
-            for(int i = 0; i < 7; i++) {
-                flag_a = flag_b = false;
-                if(index_a % 2){
-                    for(int j = index_b; j < size; j++) {
-                        total_count += ((u_int32_t(*)[size])histogram[i])[index_a][j];
-                    }
-                    index_a++;
-                    flag_a = true;
-                }
-                if(index_b % 2){
-                    for(int j = index_a; j < size; j++) {
-                        total_count += ((u_int32_t(*)[size])histogram[i])[j][index_b];
-                    }
-                    index_b++;
-                    flag_b = true;
-                }
-                if(flag_a && flag_b)
-                    total_count -= ((u_int32_t(*)[size])histogram[i])[index_a-1][index_b-1];
-
-                size /= 2;
-                index_a /= 2;
-                index_b /= 2;
-            }
-            for(int i = index_a; i < size; i++) {
-                for(int j = index_b; j < size; j++) {
-                    total_count += ((u_int32_t(*)[size])histogram[7])[i][j];
-                }
-            }
-
-            return total_count*multiplier;
-
             // Approximation, best so far
-            // return curr_size/2;
+            return curr_size/2;
         }
     }
 }
@@ -624,8 +512,7 @@ CEEngine::CEEngine(int num, DataExecuter *dataExecuter) {
     std::vector<std::vector<int>> data;
     u_int32_t A,B;
 
-    //Adjust bin and bucket sizes dynamically, based on max value
-    bin_size    = max_value/BINS;
+    //Adjust bucket sizes dynamically, based on max value
     bucket_size = max_value/BUCKETS;
 
     for (int i = 0; i < num; i+=OFFSET) {
@@ -644,14 +531,6 @@ CEEngine::CEEngine(int num, DataExecuter *dataExecuter) {
             CMS_B.insert(B);
 
             int index_a, index_b, size;
-
-            size = BINS;
-            for(int i = 0; i < 8; i++) {    
-            index_a = A/(max_value/size) < size ? A/(max_value/size) : size-1;
-            index_b = B/(max_value/size) < size ? B/(max_value/size) : size-1;
-                ((u_int32_t(*)[size])histogram[i])[index_a][index_b]++;
-                size /= 2;
-            }
 
             size = BUCKETS;
             for (int i = 0; i < BUCKET_LAYERS; i++) {
